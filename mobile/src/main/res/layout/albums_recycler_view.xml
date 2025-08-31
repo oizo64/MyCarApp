@@ -46,4 +46,17 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:text="Ładowanie albumów..." />
 
+    <!-- Floating Action Button do dodawania kont -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_account"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_add"
+        android:visibility="gone"
+        app:backgroundTint="@color/primary_color"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:tint="@color/white" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

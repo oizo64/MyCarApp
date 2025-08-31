@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/account_item_layout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- DODAJ ID do tego layoutu -->
+    <LinearLayout
+        android:id="@+id/text_content_layout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:id="@+id/server_url_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/username_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:id="@+id/default_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Domyślne"
+            android:textSize="12sp"
+            android:textColor="@color/blue_600"
+            android:visibility="gone"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/delete_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/ic_delete"
+        android:tint="@color/delete_red"
+        android:background="?attr/selectableItemBackground"
+        android:contentDescription="Usuń konto" />
+
+</LinearLayout>

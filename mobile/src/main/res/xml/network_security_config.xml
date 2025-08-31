@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Zezwolenie na połączenia HTTP tylko dla tego konkretnego adresu IP -->
-        <domain includeSubdomains="true">31.11.161.209</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

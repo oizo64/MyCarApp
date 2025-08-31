@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import androidx.core.graphics.toColorInt
 
 // Definiujemy interfejs, który będzie nasłuchiwał na kliknięcia
 interface OnItemClickListener {
@@ -58,7 +59,7 @@ class AlbumsAdapter(
         }
 
         if (isWithinLastSevenDays(album.createdAt)) {
-            holder.cardView.setCardBackgroundColor(Color.parseColor("#E8F5E9"))
+            holder.cardView.setCardBackgroundColor("#E8F5E9".toColorInt())
         } else {
             val typedValue = android.util.TypedValue()
             holder.itemView.context.theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)
@@ -98,8 +99,10 @@ class AlbumsAdapter(
             val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'", Locale.getDefault())
             val albumDate = parser.parse(dateString)
             val currentDate = Date()
-            val diffInMillies = currentDate.time - albumDate.time
-            val diffInDays = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS)
+            val diffInMillis = albumDate?.time?.let { albumTime ->
+                currentDate.time - albumTime
+            } ?: -1
+            val diffInDays = TimeUnit.DAYS.convert(diffInMillis, TimeUnit.MILLISECONDS)
             diffInDays <= 7
         } catch (e: Exception) {
             Log.e("DATE_CHECK", "Błąd sprawdzania daty: $dateString", e)

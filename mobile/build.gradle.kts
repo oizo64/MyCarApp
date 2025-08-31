@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("kotlin-parcelize")
+    id("org.jetbrains.kotlin.kapt")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -48,60 +50,35 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(project(":shared"))
 
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Retrofit
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging.interceptor)
 
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.glide)
+    implementation(libs.recyclerview)
+    implementation(libs.cardview)
+    implementation(libs.coil)
+    implementation(libs.car.app)
+    implementation(libs.androidx.media.versioned)
 
-    // OkHttp3 Logging Interceptor
-    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
+    // Hilt
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.android.compiler)
 
-    // Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Lifecycle components, aby używać lifecycleScope
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-
-    // Glide do ładowania obrazków
-    implementation("com.github.bumptech.glide:glide:4.16.0")
-
-    // RecyclerView
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-
-    // CardView
-    implementation("androidx.cardview:cardview:1.0.0")
-
-    // Retrofit (jeśli jeszcze nie masz)
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
-    // OkHttp3 Logging Interceptor (jeśli jeszcze nie masz)
-    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
-
-    // Kotlin Coroutines (jeśli jeszcze nie masz)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Lifecycle components, aby używać lifecycleScope
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-
-    implementation("io.coil-kt:coil:2.6.0")
-
-//    implementation("androidx.activity:activity-compose:1.4.0")
-//    implementation("com.squareup.okhttp3.okhttp:okhttp:4.10.0")
-//    implementation("com.squareup.okhttp3.logging:logging-interceptor:4.10.0")
-//    implementation("io.coil-kt.coil-compose:1.4.0")
-//    implementation("androidx.compose.material.material-icons-extended:1.5.0")
-//    implementation("androidx.media3.media3:media3-exoplayer:1.1.0")
-//    implementation("androidx.media3.media3:media3-session:1.1.0")
-//    implementation("androidx.media3.media3:media3-common:1.1.0")
-//    implementation("androidx.media3.media3:media3-ui:1.1.0")
-//    implementation("androidx.media.media.media:media:1.1.0")
+    implementation(libs.preference.ktx)
+    implementation(libs.exoplayer)
 
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
 
 
+    implementation ("androidx.room:room-runtime:2.6.1")
+    implementation ("androidx.room:room-ktx:2.6.1")
+    kapt ("androidx.room:room-compiler:2.6.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

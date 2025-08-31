@@ -1,31 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.mycarapp">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="androidx.car.app.NAVIGATION" />
+    <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:ignore="ForegroundServicesPolicy" />
+    <uses-permission
+        android:name="android.permission.MEDIA_CONTENT_CONTROL"
+        tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name=".MyCarApp"
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyCarApp">
-        <activity
-            android:name=".activities.PlayerActivity"
-            android:exported="false" />
+        android:theme="@style/Theme.MyCarApp"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".activities.AlbumsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".activities.AlbumAdapter"
-            android:exported="false"
-            android:theme="@style/Theme.MyCarApp" />
-        <activity
-            android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,6 +34,54 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".activities.PlayerActivity" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.AddAccountActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.AccountsManagementActivity"
+            android:exported="false" />
+
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" /> <!-- Meta-dane dla Android Auto -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <service
+            android:name=".AndroidAutoTests.MyCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.action.CAR_APP" />
+                <!-- Dodaj tę kategorię, jeśli aplikacja obsługuje nawigację/POI -->
+                <category android:name="androidx.car.app.category.POI" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".AndroidAutoTests.MusicPlaybackService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.google.android.gms.car.media.MediaBrowserService"
+                android:value="true" />
+        </service>
+
+        <receiver
+            android:name="androidx.media.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
