@@ -1,4 +1,4 @@
-package com.example.mycarapp
+package com.example.mycarapp.AndroidAutoTests
 
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -14,12 +14,19 @@ import androidx.car.app.model.Template
  */
 class MyCarSession(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
+
+        // Utwórz akcję do cofnięcia się
+        val backAction = Action.Builder()
+            .setTitle("Cofnij")
+            .setOnClickListener {
+                screenManager.pop()
+            }
+            .build()
+
         val pane = Pane.Builder()
-            .addRow(
-                Row.Builder()
-                    .setTitle("Witaj w Android Auto!")
-                    .build()
-            )
+            // Poprawiony podtytuł jako zwykły wiersz
+            .addRow(Row.Builder().setTitle("Witaj w Android Auto!").build())
+            .addAction(backAction)
             .build()
 
         return PaneTemplate.Builder(pane)

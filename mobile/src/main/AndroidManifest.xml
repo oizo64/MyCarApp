@@ -35,7 +35,7 @@
 
 
         <service
-            android:name=".MyCarAppService"
+            android:name=".AndroidAutoTests.MyCarAppService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />

@@ -1,4 +1,4 @@
-package com.example.mycarapp
+package com.example.mycarapp.AndroidAutoTests
 
 import android.content.Intent
 import androidx.car.app.CarAppService
@@ -9,7 +9,7 @@ class MyCarAppService : CarAppService() {
     override fun onCreateSession(): Session {
         return object : Session() {
             override fun onCreateScreen(intent: Intent) =
-                MyCarSession(carContext)
+                ExtendedScreen(carContext)
         }
     }
 
