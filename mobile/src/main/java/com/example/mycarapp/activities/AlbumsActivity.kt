@@ -30,6 +30,12 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     private lateinit var progressBar: ProgressBar
     private lateinit var statusTextView: TextView
 
+    private lateinit var authToken: String
+    private lateinit var subsonicSalt: String
+    private lateinit var subsonicToken: String
+    private lateinit var serverUrl: String
+    private lateinit var username: String
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.albums_recycler_view)
@@ -39,12 +45,12 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        authToken = intent?.getStringExtra("AUTH_TOKEN") ?: ""
+        subsonicSalt = intent?.getStringExtra("SUBSONIC_SALT") ?: ""
+        subsonicToken = intent?.getStringExtra("SUBSONIC_TOKEN") ?: ""
+        serverUrl = intent?.getStringExtra("SERVER_URL") ?: ""
+        username = intent?.getStringExtra("USERNAME") ?: ""
 
-        val authToken = intent.getStringExtra("AUTH_TOKEN")
-        val subsonicSalt = intent.getStringExtra("SUBSONIC_SALT")
-        val subsonicToken = intent.getStringExtra("SUBSONIC_TOKEN")
-        val serverUrl = intent.getStringExtra("SERVER_URL")
-        val username = intent.getStringExtra("USERNAME")
 
         albumsRecyclerView = findViewById(R.id.albums_main_recycler_view)
         progressBar = findViewById(R.id.loading_progress_bar)
@@ -96,11 +102,13 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     }
 
     override fun onItemClick(album: Album) {
-        // Tworzymy Intent, aby przejść do PlayerActivity
         val intent = Intent(this, PlayerActivity::class.java).apply {
-            putExtra("ALBUM_ID", album.id)
-            // Możesz przekazać cały obiekt Album, jeśli jest Parcelable
             putExtra("ALBUM_DATA", album)
+            putExtra("SERVER_URL", serverUrl)
+            putExtra("USERNAME", username)
+            putExtra("SUBSONIC_TOKEN", subsonicToken)
+            putExtra("SUBSONIC_SALT", subsonicSalt)
+            putExtra("AUTH_TOKEN", authToken)
         }
         startActivity(intent)
     }

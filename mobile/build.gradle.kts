@@ -86,6 +86,10 @@ dependencies {
 
     implementation("io.coil-kt:coil:2.6.0")
 
+    implementation("androidx.car.app:app:1.7.0")
+    implementation("androidx.media:media:1.7.1")
+
+
 //    implementation("androidx.activity:activity-compose:1.4.0")
 //    implementation("com.squareup.okhttp3.okhttp:okhttp:4.10.0")
 //    implementation("com.squareup.okhttp3.logging:logging-interceptor:4.10.0")

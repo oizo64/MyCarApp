@@ -35,15 +35,13 @@ interface ApiService {
         @Query("size") size: Int
     ): Response<ResponseBody>
 
-    interface ApiService {
-        @GET("api/song")
-        suspend fun getSongsForAlbum(
-            @Query("album_id") albumId: String,
-            @Query("_start") start: Int = 0,
-            @Query("_end") end: Int = -1,
-            @Query("_sort") sort: String = "trackNumber",
-            @Query("_order") order: String = "ASC"
-        ): Response<List<SongResponse>>
-    }
+    @GET("api/song")
+    suspend fun getSongsForAlbum(
+        @Query("album_id") albumId: String,
+        @Query("_start") start: Int = 0,
+        @Query("_end") end: Int = -1,
+        @Query("_sort") sort: String = "trackNumber",
+        @Query("_order") order: String = "ASC"
+    ): Response<List<SongResponse>>
 }
 
