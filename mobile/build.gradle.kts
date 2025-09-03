@@ -55,41 +55,16 @@ dependencies {
     // Retrofit (jeśli jeszcze nie masz)
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
-
-    // OkHttp3 Logging Interceptor
-    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
-
-    // Kotlin Coroutines
+    implementation("com.squareup.okhttp3:logging-interceptor:5.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-
-    // Lifecycle components, aby używać lifecycleScope
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3")
-
-    // Glide do ładowania obrazków
     implementation("com.github.bumptech.glide:glide:5.0.4")
-
-    // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-
-    // CardView
     implementation("androidx.cardview:cardview:1.0.0")
-
-    // OkHttp3 Logging Interceptor (jeśli jeszcze nie masz)
-    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
-
-    // Kotlin Coroutines (jeśli jeszcze nie masz)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-
-    // Lifecycle components, aby używać lifecycleScope
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3")
-
     implementation("io.coil-kt:coil:2.7.0")
-
     implementation("androidx.car.app:app:1.7.0")
     implementation("androidx.media:media:1.7.1")
-
     implementation("com.google.dagger:hilt-android:2.57.1")
-
     implementation("androidx.preference:preference-ktx:1.2.1") // Upewnij się, że używasz poprawnej wersji KTX
     kapt("com.google.dagger:hilt-android-compiler:2.57.1")
 

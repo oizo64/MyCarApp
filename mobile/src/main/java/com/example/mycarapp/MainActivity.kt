@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,7 +38,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
         // Inicjalizacja widoków
@@ -77,7 +75,8 @@ class MainActivity : AppCompatActivity() {
 
         // Prosta walidacja
         if (serverUrl.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            statusTextView.text = getString(R.string.status_login_error) // Przykładowy zasób, możesz stworzyć dedykowany dla pustych pól            return
+            statusTextView.text =
+                getString(R.string.status_login_error) // Przykładowy zasób, możesz stworzyć dedykowany dla pustych pól            return
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -100,7 +99,8 @@ class MainActivity : AppCompatActivity() {
 
             // Aktualizacja statusu na UI (na wątku głównym)
             runOnUiThread {
-                statusTextView.text = getString(R.string.status_connecting)            }
+                statusTextView.text = getString(R.string.status_connecting)
+            }
             try {
                 val loginRequest = LoginRequest(username = username, password = password)
                 val response = navidromeApiService.login(loginRequest)
@@ -114,7 +114,8 @@ class MainActivity : AppCompatActivity() {
                     AuthTokenHolder.authToken = authToken
 
                     runOnUiThread {
-                        statusTextView.text = getString(R.string.status_login_success)                    }
+                        statusTextView.text = getString(R.string.status_login_success)
+                    }
 
                     // Uruchomienie nowej aktywności
                     val intent = Intent(this@MainActivity, AlbumsActivity::class.java).apply {
