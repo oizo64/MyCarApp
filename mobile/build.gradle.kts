@@ -74,8 +74,6 @@ dependencies {
     // CardView
     implementation("androidx.cardview:cardview:1.0.0")
 
-
-
     // OkHttp3 Logging Interceptor (jeśli jeszcze nie masz)
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
 
@@ -95,22 +93,9 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1") // Upewnij się, że używasz poprawnej wersji KTX
     kapt("com.google.dagger:hilt-android-compiler:2.57.1")
 
-//    implementation("androidx.activity:activity-compose:1.4.0")
-//    implementation("com.squareup.okhttp3.okhttp:okhttp:4.10.0")
-//    implementation("com.squareup.okhttp3.logging:logging-interceptor:4.10.0")
-//    implementation("io.coil-kt.coil-compose:1.4.0")
-//    implementation("androidx.compose.material.material-icons-extended:1.5.0")
-//    implementation("androidx.media3.media3:media3-exoplayer:1.1.0")
-//    implementation("androidx.media3.media3:media3-session:1.1.0")
-//    implementation("androidx.media3.media3:media3-common:1.1.0")
-//    implementation("androidx.media3.media3:media3-ui:1.1.0")
-//    implementation("androidx.media.media.media:media:1.1.0")
-
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
-
-
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
