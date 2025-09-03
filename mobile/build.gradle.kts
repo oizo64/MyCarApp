@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("kotlin-parcelize")
+    // Dodaj wtyczkę Kapt tutaj
+    id("org.jetbrains.kotlin.kapt")
+    // Dodaj wtyczkę Hilt
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -89,6 +93,10 @@ dependencies {
     implementation("androidx.car.app:app:1.7.0")
     implementation("androidx.media:media:1.7.1")
 
+    implementation("com.google.dagger:hilt-android:2.48")
+
+    implementation("androidx.preference:preference-ktx:1.2.1") // Upewnij się, że używasz poprawnej wersji KTX
+    kapt("com.google.dagger:hilt-android-compiler:2.48")
 
 //    implementation("androidx.activity:activity-compose:1.4.0")
 //    implementation("com.squareup.okhttp3.okhttp:okhttp:4.10.0")

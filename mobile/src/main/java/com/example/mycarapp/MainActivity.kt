@@ -53,10 +53,10 @@ class MainActivity : AppCompatActivity() {
         statusTextView = findViewById(R.id.status_text_view)
 
         // Ustawienie domyślnych wartości testowych
-        serverUrlEditText.setText("http://31.11.161.209:4533")
-        usernameEditText.setText("piotr")
-        passwordEditText.setText("Mr.oizo6446")
-        statusTextView.text = "Wpisano dane testowe."
+        serverUrlEditText.setText(getString(R.string.server_address))
+        usernameEditText.setText(getString(R.string.login))
+        passwordEditText.setText(getString(R.string.password))
+        statusTextView.text = getString(R.string.status_initial_text) // Odwołanie do zasobu
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -77,8 +77,7 @@ class MainActivity : AppCompatActivity() {
 
         // Prosta walidacja
         if (serverUrl.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            statusTextView.text = "Niepowodzenie: Uzupełnij wszystkie pola."
-            return
+            statusTextView.text = getString(R.string.status_login_error) // Przykładowy zasób, możesz stworzyć dedykowany dla pustych pól            return
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -101,8 +100,7 @@ class MainActivity : AppCompatActivity() {
 
             // Aktualizacja statusu na UI (na wątku głównym)
             runOnUiThread {
-                statusTextView.text = "Trwa łączenie..."
-            }
+                statusTextView.text = getString(R.string.status_connecting)            }
             try {
                 val loginRequest = LoginRequest(username = username, password = password)
                 val response = navidromeApiService.login(loginRequest)
@@ -116,8 +114,7 @@ class MainActivity : AppCompatActivity() {
                     AuthTokenHolder.authToken = authToken
 
                     runOnUiThread {
-                        statusTextView.text = "Zalogowano pomyślnie! Przechodzę do albumów..."
-                    }
+                        statusTextView.text = getString(R.string.status_login_success)                    }
 
                     // Uruchomienie nowej aktywności
                     val intent = Intent(this@MainActivity, AlbumsActivity::class.java).apply {
@@ -131,13 +128,13 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     Log.e("API_AUTH", "Błąd logowania: ${response.code()} - ${response.message()}")
                     runOnUiThread {
-                        statusTextView.text = "Błąd logowania. Sprawdź dane."
+                        statusTextView.text = getString(R.string.status_login_error)
                     }
                 }
             } catch (e: Exception) {
                 Log.e("API_AUTH", "Wyjątek podczas logowania:", e)
                 runOnUiThread {
-                    statusTextView.text = "Błąd: Nie udało się połączyć."
+                    statusTextView.text = getString(R.string.status_network_error)
                 }
             }
         }

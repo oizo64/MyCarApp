@@ -1,3 +1,26 @@
 <resources>
     <string name="app_name">MyCarApp!</string>
+    <string name="edit_text_server_url_hint">Adres serwera</string>
+    <string name="edit_text_username_hint">Nazwa użytkownika</string>
+    <string name="edit_text_password_hint">Hasło</string>
+    <string name="connect_button_text">Połącz</string>
+    <string name="status_initial_text">Wpisano dane testowe.</string>
+    <string name="status_connecting">Trwa łączenie...</string>
+    <string name="status_login_success">Zalogowano pomyślnie! Przechodzę do albumów...</string>
+    <string name="status_login_error">Błąd logowania. Sprawdź dane.</string>
+    <string name="status_network_error">Błąd: Nie udało się połączyć.</string>
+
+    <!-- Przykład dla AlbumsActivity -->
+    <string name="albums_loading_error">Wystąpił błąd: %1$s</string>
+    <string name="albums_empty_message">Nie znaleziono albumów.</string>
+
+    <string name="status_error_with_message">Błąd: %1$s</string>
+
+    <string name="login">piotr</string>
+    <string name="password">Mr.oizo6446</string>
+    <string name="server_address">http://31.11.161.209:4533</string>
+    <string name="no_data_found">Nie znaleziono danych</string>
+    <string name="artist">Artysta: %1$s</string>
+    <string name="created">Created: %1$s</string>
+
 </resources>

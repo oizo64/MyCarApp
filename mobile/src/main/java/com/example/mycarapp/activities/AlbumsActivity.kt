@@ -89,11 +89,11 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
                     albumsRecyclerView.adapter = albumsAdapter
                     albumsRecyclerView.visibility = View.VISIBLE
                 } else {
-                    statusTextView.text = "Nie znaleziono albumów."
-                    statusTextView.visibility = View.VISIBLE
+                    statusTextView.text =
+                        getString(R.string.no_data_found) // Gdzie 'no_data_found' jest zdefiniowane w strings.xml                    statusTextView.visibility = View.VISIBLE
                 }
             } catch (e: Exception) {
-                statusTextView.text = "Wystąpił błąd: ${e.message}"
+                statusTextView.text = getString(R.string.status_error_with_message, e.message)
                 statusTextView.visibility = View.VISIBLE
             } finally {
                 progressBar.visibility = View.GONE

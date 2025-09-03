@@ -49,7 +49,6 @@ class PlayerActivity : AppCompatActivity() {
     private var mediaPlayer: MediaPlayer? = null
     private var totalDuration: Long = 0
 
-    private var playedSongId: String? = null
     private var streamUrl: String? = null
 
     companion object {
@@ -99,7 +98,7 @@ class PlayerActivity : AppCompatActivity() {
         val subsonicSalt = intent.getStringExtra("SUBSONIC_SALT")
         val authToken = intent.getStringExtra("AUTH_TOKEN")
 
-        var playedSongId: String? = null
+        var playedSongId: String?
 
         if (album == null || serverUrl == null || username == null || subsonicToken == null || subsonicSalt == null) {
             Log.e("PlayerActivity", "Błąd: Brak wszystkich danych do odtwarzania.")
@@ -172,8 +171,8 @@ class PlayerActivity : AppCompatActivity() {
 
         album.let {
             albumNameTextView.text = it.name
-            albumArtistTextView.text = "Artysta: ${it.albumArtist}"
-            albumCreatedTextView.text = "Created: ${formatDate(it.createdAt)}"
+            albumArtistTextView.text = getString(R.string.artist, it.albumArtist)
+            albumCreatedTextView.text = getString(R.string.created, formatDate(it.createdAt))
 
             albumCoverImageView.load(it.coverArtUrl) {
                 crossfade(true)
@@ -302,7 +301,7 @@ class PlayerActivity : AppCompatActivity() {
             val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val date: Date? = parser.parse(dateString)
             date?.let { formatter.format(it) } ?: "Brak daty"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "Błędna data"
         }
     }
