@@ -52,10 +52,9 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(project(":shared"))
 
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Retrofit (jeśli jeszcze nie masz)
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 
     // OkHttp3 Logging Interceptor
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
@@ -75,9 +74,7 @@ dependencies {
     // CardView
     implementation("androidx.cardview:cardview:1.0.0")
 
-    // Retrofit (jeśli jeszcze nie masz)
-    implementation("com.squareup.retrofit2:retrofit:3.0.0")
-    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+
 
     // OkHttp3 Logging Interceptor (jeśli jeszcze nie masz)
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
