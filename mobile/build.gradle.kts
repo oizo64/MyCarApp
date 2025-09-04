@@ -65,7 +65,8 @@ dependencies {
     implementation("androidx.car.app:app:1.7.0")
     implementation("androidx.media:media:1.7.1")
     implementation("com.google.dagger:hilt-android:2.57.1")
-    implementation("androidx.preference:preference-ktx:1.2.1") // Upewnij się, że używasz poprawnej wersji KTX
+    implementation("androidx.preference:preference-ktx:1.2.1")
+    implementation("com.google.android.exoplayer:exoplayer:2.19.1")
     kapt("com.google.dagger:hilt-android-compiler:2.57.1")
 
     implementation(libs.androidx.material3)
