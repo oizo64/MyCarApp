@@ -1,6 +1,7 @@
 package com.example.mycarapp.activities
 
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -10,6 +11,7 @@ import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -75,6 +77,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
@@ -82,7 +85,7 @@ class PlayerActivity : AppCompatActivity() {
         setupUI()
 
         appConfig = configManager.getConfig()
-        val album = intent.getParcelableExtra<Album>("ALBUM_DATA")
+        val album = intent.getParcelableExtra("ALBUM_DATA", Album::class.java)
 
         if (album == null) {
             Log.e("PlayerActivity", "Błąd: Brak danych albumu.")
@@ -268,7 +271,7 @@ class PlayerActivity : AppCompatActivity() {
                 totalTimeTextView.text = formatTime(totalDuration)
                 handler.post(updateSeekBarRunnable)
             }
-            setOnErrorListener { mp, what, extra ->
+            setOnErrorListener { _, what, extra ->
                 Log.e("PlayerActivity", "Błąd MediaPlayer: what=$what, extra=$extra")
                 Toast.makeText(this@PlayerActivity, "Błąd odtwarzania.", Toast.LENGTH_SHORT).show()
                 false
