@@ -8,19 +8,22 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="androidx.car.app.NAVIGATION" />
     <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
-    <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL"
+    <uses-permission
+        android:name="android.permission.MEDIA_CONTENT_CONTROL"
         tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name=".MyCarApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyCarApp"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:theme="@style/Theme.MyCarApp">
 
         <activity
             android:name=".MainActivity"
@@ -60,7 +63,9 @@
                 android:value="true" />
         </service>
 
-        <receiver android:name="androidx.media.session.MediaButtonReceiver" android:exported="true">
+        <receiver
+            android:name="androidx.media.session.MediaButtonReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>

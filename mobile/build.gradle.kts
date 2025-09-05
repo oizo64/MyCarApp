@@ -52,22 +52,26 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(project(":shared"))
 
-    // Retrofit (jeśli jeszcze nie masz)
-    implementation("com.squareup.retrofit2:retrofit:3.0.0")
-    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3")
-    implementation("com.github.bumptech.glide:glide:5.0.4")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
+    // Retrofit - POPRAWIONE wersje
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.cardview:cardview:1.0.0")
-    implementation("io.coil-kt:coil:2.7.0")
+    implementation("io.coil-kt:coil:2.5.0")
     implementation("androidx.car.app:app:1.7.0")
-    implementation("androidx.media:media:1.7.1")
-    implementation("com.google.dagger:hilt-android:2.57.1")
+    implementation("androidx.media:media:1.6.0")
+
+    // Hilt - używaj tej samej wersji
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-android-compiler:2.48")
+
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("com.google.android.exoplayer:exoplayer:2.19.1")
-    kapt("com.google.dagger:hilt-android-compiler:2.57.1")
 
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.fragment.ktx)

@@ -12,20 +12,25 @@ import androidx.lifecycle.lifecycleScope
 import com.example.mycarapp.activities.AlbumsActivity
 import com.example.mycarapp.controller.ApiService
 import com.example.mycarapp.dto.LoginRequest
+import com.example.mycarapp.HiltModule.AppConfig
+import com.example.mycarapp.HiltModule.AppModule
+import com.example.mycarapp.HiltModule.ConfigManager
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import javax.inject.Inject
 
-object AuthTokenHolder {
-    var authToken: String? = null
-}
-
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+
+    @Inject
+    lateinit var configManager: ConfigManager
 
     private lateinit var serverUrlLayout: TextInputLayout
     private lateinit var usernameLayout: TextInputLayout
@@ -54,7 +59,7 @@ class MainActivity : AppCompatActivity() {
         serverUrlEditText.setText(getString(R.string.server_address))
         usernameEditText.setText(getString(R.string.login))
         passwordEditText.setText(getString(R.string.password))
-        statusTextView.text = getString(R.string.status_initial_text) // Odwołanie do zasobu
+        statusTextView.text = getString(R.string.status_initial_text)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -75,8 +80,8 @@ class MainActivity : AppCompatActivity() {
 
         // Prosta walidacja
         if (serverUrl.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            statusTextView.text =
-                getString(R.string.status_login_error) // Przykładowy zasób, możesz stworzyć dedykowany dla pustych pól            return
+            statusTextView.text = getString(R.string.status_login_error)
+            return
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -101,6 +106,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 statusTextView.text = getString(R.string.status_connecting)
             }
+
             try {
                 val loginRequest = LoginRequest(username = username, password = password)
                 val response = navidromeApiService.login(loginRequest)
@@ -110,22 +116,28 @@ class MainActivity : AppCompatActivity() {
                     val authToken = loginResult.token
                     Log.d("API_AUTH", "Logowanie udane, token: $authToken")
 
-                    // Przechowanie tokenu dla przyszłych wywołań
-                    AuthTokenHolder.authToken = authToken
+                    // Zapisanie danych do konfiguracji przez ConfigManager
+                    val appConfig = AppConfig(
+                        authToken = authToken,
+                        subsonicSalt = loginResult.subsonicSalt,
+                        subsonicToken = loginResult.subsonicToken,
+                        serverUrl = serverUrl,
+                        username = username
+                    )
+
+                    configManager.updateConfig(appConfig)
 
                     runOnUiThread {
                         statusTextView.text = getString(R.string.status_login_success)
                     }
 
                     // Uruchomienie nowej aktywności
-                    val intent = Intent(this@MainActivity, AlbumsActivity::class.java).apply {
-                        putExtra("AUTH_TOKEN", authToken)
-                        putExtra("SUBSONIC_SALT", loginResult.subsonicSalt)
-                        putExtra("SUBSONIC_TOKEN", loginResult.subsonicToken)
-                        putExtra("SERVER_URL", serverUrl)
-                        putExtra("USERNAME", username)
-                    }
+                    val intent = Intent(this@MainActivity, AlbumsActivity::class.java)
                     startActivity(intent)
+
+                    // Opcjonalnie: zakończ aktualną aktywność
+                    finish()
+
                 } else {
                     Log.e("API_AUTH", "Błąd logowania: ${response.code()} - ${response.message()}")
                     runOnUiThread {
@@ -139,6 +151,5 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
     }
 }

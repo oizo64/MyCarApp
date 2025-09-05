@@ -16,9 +16,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import coil.load
 import coil.transform.RoundedCornersTransformation
+import com.example.mycarapp.HiltModule.AppConfig
+import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.R
 import com.example.mycarapp.controller.ApiService
 import com.example.mycarapp.dto.Album
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,28 +35,27 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
 
-
+@AndroidEntryPoint
 class PlayerActivity : AppCompatActivity() {
 
+    @Inject
+    lateinit var configManager: ConfigManager
     private lateinit var playPauseButton: ImageButton
     private lateinit var seekBar: SeekBar
     private lateinit var currentTimeTextView: TextView
     private lateinit var totalTimeTextView: TextView
-
+    private lateinit var appConfig: AppConfig
     // Stan odtwarzacza
     private var isPlaying = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())
     private var mediaPlayer: MediaPlayer? = null
     private var totalDuration: Long = 0
-
     private var streamUrl: String? = null
-
-    companion object {
-        private const val SKIP_TIME_MS = 60000 // 1 minuta w milisekundach
-    }
+    private val SKIP_TIME_MS = 60000
 
     private val updateSeekBarRunnable = object : Runnable {
         override fun run() {
@@ -90,13 +92,14 @@ class PlayerActivity : AppCompatActivity() {
             insets
         }
 
-        // 3. Pobierz dane z Intent
+        // Pobranie konfiguracji z ConfigManager
+        appConfig = configManager.getConfig()
         val album = intent.getParcelableExtra<Album>("ALBUM_DATA")
-        val serverUrl = intent.getStringExtra("SERVER_URL")
-        val username = intent.getStringExtra("USERNAME")
-        val subsonicToken = intent.getStringExtra("SUBSONIC_TOKEN")
-        val subsonicSalt = intent.getStringExtra("SUBSONIC_SALT")
-        val authToken = intent.getStringExtra("AUTH_TOKEN")
+        val serverUrl = appConfig.serverUrl
+        val username = appConfig.username
+        val subsonicToken = appConfig.subsonicToken
+        val subsonicSalt = appConfig.subsonicSalt
+        val authToken = appConfig.authToken
 
         var playedSongId: String?
 
@@ -146,7 +149,6 @@ class PlayerActivity : AppCompatActivity() {
                     val firstSong = response.body()!![0]
                     playedSongId = firstSong.id
 
-                    // DOPIERO TERAZ utwórz streamUrl
                     streamUrl =
                         "$serverUrl/rest/stream?u=$username&t=$subsonicToken&s=$subsonicSalt&v=1.8.0&c=NavidromeUI&id=$playedSongId"
 
@@ -185,7 +187,6 @@ class PlayerActivity : AppCompatActivity() {
         totalDuration = duration
         totalTimeTextView.text = formatTime(totalDuration)
 
-        // Obsługa kliknięć przycisków
         playPauseButton.setOnClickListener {
             if (isPlaying.get()) {
                 pausePlayback()
@@ -194,7 +195,6 @@ class PlayerActivity : AppCompatActivity() {
                     startPlayback(streamUrl)
                 } else {
                     Log.e("PlayerActivity", "Stream URL nie jest jeszcze dostępny")
-                    // Możesz pokazać Toast lub dialog informujący
                 }
             }
         }
@@ -241,8 +241,6 @@ class PlayerActivity : AppCompatActivity() {
                         it.start()
                         this@PlayerActivity.isPlaying.set(true)
                         playPauseButton.setImageResource(R.drawable.ic_pause)
-
-                        // ✅ USTAWIAMY MAX DOPIERO TERAZ, NA PODSTAWIE RZECZYWISTEGO CZASU UTWORU
                         seekBar.max = it.duration
                         totalDuration = it.duration.toLong()
                         totalTimeTextView.text = formatTime(totalDuration)
@@ -309,13 +307,10 @@ class PlayerActivity : AppCompatActivity() {
     private fun skipBackward() {
         mediaPlayer?.let { player ->
             val currentPosition = player.currentPosition
-            val newPosition = max(0, currentPosition - SKIP_TIME_MS) // Nie mniej niż 0
-
+            val newPosition = max(0, currentPosition - SKIP_TIME_MS)
             player.seekTo(newPosition)
             seekBar.progress = newPosition
             currentTimeTextView.text = formatTime(newPosition.toLong())
-
-            // Opcjonalnie: wizualna informacja o przewinięciu
             showSkipFeedback("-1:00")
         }
     }
@@ -324,19 +319,15 @@ class PlayerActivity : AppCompatActivity() {
         mediaPlayer?.let { player ->
             val currentPosition = player.currentPosition
             val newPosition =
-                min(player.duration, currentPosition + SKIP_TIME_MS) // Nie więcej niż duration
-
+                min(player.duration, currentPosition + SKIP_TIME_MS)
             player.seekTo(newPosition)
             seekBar.progress = newPosition
             currentTimeTextView.text = formatTime(newPosition.toLong())
-
-            // Opcjonalnie: wizualna informacja o przewinięciu
             showSkipFeedback("+1:00")
         }
     }
 
     private fun showSkipFeedback(text: String) {
-        // Możesz dodać Toast lub animację
         Toast.makeText(this, "Przewinięto: $text", Toast.LENGTH_SHORT).show()
     }
 
