@@ -24,6 +24,7 @@ import com.example.mycarapp.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
@@ -42,29 +43,40 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.albums_recycler_view)
 
+        setupUI()
+
+        appConfig = configManager.getConfig()
+        if (!checkUserLoginState()) {
+            return
+        }
+
+        initializeRepository()
+        loadAlbums()
+    }
+
+    private fun setupUI() {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.albums_main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // Pobranie konfiguracji z ConfigManager
-        appConfig = configManager.getConfig()
-
-        // Sprawdzenie czy użytkownik jest zalogowany
-        if (appConfig.authToken.isNullOrEmpty() || appConfig.serverUrl.isNullOrEmpty()) {
-            // Jeśli brakuje danych logowania, wróć do MainActivity
-            val intent = Intent(this, MainActivity::class.java)
-            startActivity(intent)
-            finish()
-            return
-        }
-
         albumsRecyclerView = findViewById(R.id.albums_main_recycler_view)
         progressBar = findViewById(R.id.loading_progress_bar)
         statusTextView = findViewById(R.id.status_text_view)
+    }
 
-        // Inicjalizacja repozytorium z danymi z konfiguracji
+    private fun checkUserLoginState(): Boolean {
+        if (appConfig.authToken.isNullOrEmpty() || appConfig.serverUrl.isNullOrEmpty()) {
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
+            finish()
+            return false
+        }
+        return true
+    }
+
+    private fun initializeRepository() {
         albumsRepository = RemoteAlbumsRepository(
             authToken = appConfig.authToken!!,
             subsonicSalt = appConfig.subsonicSalt ?: "",
@@ -72,50 +84,62 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
             serverUrl = appConfig.serverUrl!!,
             username = appConfig.username ?: ""
         )
-
-        loadAlbums()
     }
 
     private fun loadAlbums() {
         lifecycleScope.launch {
-            progressBar.visibility = View.VISIBLE
-            albumsRecyclerView.visibility = View.GONE
-            statusTextView.visibility = View.GONE
-
+            showLoadingState()
             try {
-                // Pobranie danych z serwisu
                 val unsortedAlbumsList = albumsRepository.getAlbums()
-
-                // Sortowanie listy po dacie createdAt, od najnowszych
-                val sortedAlbumsList = unsortedAlbumsList.sortedByDescending { album ->
-                    try {
-                        // Tworzenie formattera do parsowania daty
-                        val parser = SimpleDateFormat(
-                            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'",
-                            Locale.getDefault()
-                        )
-                        parser.parse(album.createdAt) // Parsowanie daty
-                    } catch (e: Exception) {
-                        Log.e("SORT_DATE", "Błąd parsowania daty: ${album.createdAt}", e)
-                        null // Zwracamy null w przypadku błędu, co umieści element na końcu
-                    }
-                }
-
-                if (sortedAlbumsList.isNotEmpty()) {
-                    albumsAdapter = AlbumsAdapter(sortedAlbumsList, this@AlbumsActivity)
-                    albumsRecyclerView.layoutManager = LinearLayoutManager(this@AlbumsActivity)
-                    albumsRecyclerView.adapter = albumsAdapter
-                    albumsRecyclerView.visibility = View.VISIBLE
-                } else {
-                    statusTextView.text = getString(R.string.no_data_found)
-                    statusTextView.visibility = View.VISIBLE
-                }
+                val sortedAlbumsList = sortAlbumsByDate(unsortedAlbumsList)
+                updateUIWithAlbums(sortedAlbumsList)
             } catch (e: Exception) {
-                statusTextView.text = getString(R.string.status_error_with_message, e.message)
-                statusTextView.visibility = View.VISIBLE
+                showErrorState(e.message)
                 Log.e("ALBUMS_LOAD", "Błąd ładowania albumów", e)
             } finally {
-                progressBar.visibility = View.GONE
+                hideLoadingState()
+            }
+        }
+    }
+
+    private fun showLoadingState() {
+        progressBar.visibility = View.VISIBLE
+        albumsRecyclerView.visibility = View.GONE
+        statusTextView.visibility = View.GONE
+    }
+
+    private fun hideLoadingState() {
+        progressBar.visibility = View.GONE
+    }
+
+    private fun updateUIWithAlbums(albums: List<Album>) {
+        if (albums.isNotEmpty()) {
+            albumsAdapter = AlbumsAdapter(albums, this@AlbumsActivity)
+            albumsRecyclerView.layoutManager = LinearLayoutManager(this@AlbumsActivity)
+            albumsRecyclerView.adapter = albumsAdapter
+            albumsRecyclerView.visibility = View.VISIBLE
+        } else {
+            statusTextView.text = getString(R.string.no_data_found)
+            statusTextView.visibility = View.VISIBLE
+        }
+    }
+
+    private fun showErrorState(message: String?) {
+        statusTextView.text = getString(R.string.status_error_with_message, message)
+        statusTextView.visibility = View.VISIBLE
+    }
+
+    private fun sortAlbumsByDate(albums: List<Album>): List<Album> {
+        return albums.sortedByDescending { album ->
+            try {
+                val parser = SimpleDateFormat(
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'",
+                    Locale.getDefault()
+                )
+                parser.parse(album.createdAt)
+            } catch (e: Exception) {
+                Log.e("SORT_DATE", "Błąd parsowania daty: ${album.createdAt}", e)
+                Date(0) // Używamy bardzo starej daty, aby element trafił na koniec listy
             }
         }
     }
@@ -129,7 +153,5 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
 
     override fun onResume() {
         super.onResume()
-        // Optional: Odśwież dane jeśli to konieczne
-        // loadAlbums()
     }
 }

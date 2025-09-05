@@ -14,6 +14,7 @@ import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.activities.AlbumsActivity
 import com.example.mycarapp.controller.ApiService
 import com.example.mycarapp.dto.LoginRequest
+import com.example.mycarapp.dto.LoginResponse
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,7 +45,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Inicjalizacja widoków
+        setupUI()
+        setupListeners()
+        applyWindowInsets()
+    }
+
+    private fun setupUI() {
         serverUrlLayout = findViewById(R.id.server_url_layout)
         usernameLayout = findViewById(R.id.username_layout)
         passwordLayout = findViewById(R.id.password_layout)
@@ -59,96 +65,110 @@ class MainActivity : AppCompatActivity() {
         usernameEditText.setText(getString(R.string.login))
         passwordEditText.setText(getString(R.string.password))
         statusTextView.text = getString(R.string.status_initial_text)
+    }
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-
+    private fun setupListeners() {
         connectButton.setOnClickListener {
             performLogin()
         }
     }
 
+    private fun applyWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+    }
+
     private fun performLogin() {
-        // Pobranie wartości z pól
         val serverUrl = serverUrlEditText.text.toString().trim()
         val username = usernameEditText.text.toString().trim()
         val password = passwordEditText.text.toString().trim()
 
-        // Prosta walidacja
-        if (serverUrl.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            statusTextView.text = getString(R.string.status_login_error)
+        if (!validateInput(serverUrl, username, password)) {
             return
         }
 
+        loginUser(serverUrl, username, password)
+    }
+
+    private fun validateInput(serverUrl: String, username: String, password: String): Boolean {
+        if (serverUrl.isEmpty() || username.isEmpty() || password.isEmpty()) {
+            statusTextView.text = getString(R.string.status_login_error)
+            return false
+        }
+        return true
+    }
+
+    private fun loginUser(serverUrl: String, username: String, password: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            // Zbudowanie klienta HTTP z interceptorem logującym
-            val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            }
-            val client = OkHttpClient.Builder()
-                .addInterceptor(loggingInterceptor)
-                .build()
-
-            // Zbudowanie instancji Retrofit
-            val retrofit = Retrofit.Builder()
-                .baseUrl("$serverUrl/")
-                .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-
-            val navidromeApiService = retrofit.create(ApiService::class.java)
-
-            // Aktualizacja statusu na UI (na wątku głównym)
             runOnUiThread {
                 statusTextView.text = getString(R.string.status_connecting)
             }
 
             try {
+                val apiService = createApiService(serverUrl)
                 val loginRequest = LoginRequest(username = username, password = password)
-                val response = navidromeApiService.login(loginRequest)
+                val response = apiService.login(loginRequest)
 
                 if (response.isSuccessful && response.body() != null) {
-                    val loginResult = response.body()!!
-                    val authToken = loginResult.token
-                    Log.d("API_AUTH", "Logowanie udane, token: $authToken")
-
-                    // Zapisanie danych do konfiguracji przez ConfigManager
-                    val appConfig = AppConfig(
-                        authToken = authToken,
-                        subsonicSalt = loginResult.subsonicSalt,
-                        subsonicToken = loginResult.subsonicToken,
-                        serverUrl = serverUrl,
-                        username = username
-                    )
-
-                    configManager.updateConfig(appConfig)
-
-                    runOnUiThread {
-                        statusTextView.text = getString(R.string.status_login_success)
-                    }
-
-                    // Uruchomienie nowej aktywności
-                    val intent = Intent(this@MainActivity, AlbumsActivity::class.java)
-                    startActivity(intent)
-
-                    // Opcjonalnie: zakończ aktualną aktywność
-                    finish()
-
+                    handleSuccessfulLogin(response.body()!!, serverUrl, username)
                 } else {
-                    Log.e("API_AUTH", "Błąd logowania: ${response.code()} - ${response.message()}")
-                    runOnUiThread {
-                        statusTextView.text = getString(R.string.status_login_error)
-                    }
+                    handleLoginError(response.code(), response.message())
                 }
             } catch (e: Exception) {
-                Log.e("API_AUTH", "Wyjątek podczas logowania:", e)
-                runOnUiThread {
-                    statusTextView.text = getString(R.string.status_network_error)
-                }
+                handleNetworkError(e)
             }
+        }
+    }
+
+    private fun createApiService(serverUrl: String): ApiService {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        val client = OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .build()
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl("$serverUrl/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        return retrofit.create(ApiService::class.java)
+    }
+
+    private fun handleSuccessfulLogin(loginResult: LoginResponse, serverUrl: String, username: String) {
+        val appConfig = AppConfig(
+            authToken = loginResult.token,
+            subsonicSalt = loginResult.subsonicSalt,
+            subsonicToken = loginResult.subsonicToken,
+            serverUrl = serverUrl,
+            username = username
+        )
+        configManager.updateConfig(appConfig)
+
+        runOnUiThread {
+            statusTextView.text = getString(R.string.status_login_success)
+            val intent = Intent(this@MainActivity, AlbumsActivity::class.java)
+            startActivity(intent)
+            finish()
+        }
+    }
+
+    private fun handleLoginError(code: Int, message: String?) {
+        Log.e("API_AUTH", "Błąd logowania: $code - $message")
+        runOnUiThread {
+            statusTextView.text = getString(R.string.status_login_error)
+        }
+    }
+
+    private fun handleNetworkError(e: Exception) {
+        Log.e("API_AUTH", "Wyjątek podczas logowania:", e)
+        runOnUiThread {
+            statusTextView.text = getString(R.string.status_network_error)
         }
     }
 }

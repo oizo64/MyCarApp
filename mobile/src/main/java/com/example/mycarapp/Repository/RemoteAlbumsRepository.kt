@@ -17,7 +17,9 @@ class RemoteAlbumsRepository(
     private val username: String?
 ) : AlbumsRepository {
 
-    private val apiService: ApiService by lazy {
+    private val apiService: ApiService = createApiService()
+
+    private fun createApiService(): ApiService {
         val authInterceptor = Interceptor { chain ->
             val originalRequest = chain.request()
             val modifiedRequest = originalRequest.newBuilder()
@@ -38,7 +40,7 @@ class RemoteAlbumsRepository(
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
-        retrofit.create(ApiService::class.java)
+        return retrofit.create(ApiService::class.java)
     }
 
     override suspend fun getAlbums(): List<Album> {
@@ -46,7 +48,6 @@ class RemoteAlbumsRepository(
             val response = apiService.getAlbums()
             if (response.isSuccessful) {
                 val albums = response.body() ?: emptyList()
-                // Uzupełnienie każdego albumu o URL okładki
                 albums.map { album ->
                     album.copy(coverArtUrl = generateCoverArtUrl(album.id))
                 }
