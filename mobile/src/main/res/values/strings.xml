@@ -16,6 +16,8 @@
 
     <string name="status_error_with_message">Błąd: %1$s</string>
 
+    <string name="artist_label">Artysta: %s</string>
+
     <string name="login">piotr</string>
     <string name="password">Mr.oizo6446</string>
     <string name="server_address">http://31.11.161.209:4533</string>
