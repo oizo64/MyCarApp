@@ -49,6 +49,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var currentTimeTextView: TextView
     private lateinit var totalTimeTextView: TextView
     private lateinit var appConfig: AppConfig
+
     // Stan odtwarzacza
     private var isPlaying = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())

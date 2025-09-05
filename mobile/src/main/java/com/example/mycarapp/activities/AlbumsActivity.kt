@@ -123,11 +123,6 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     override fun onItemClick(album: Album) {
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra("ALBUM_DATA", album)
-//            putExtra("SERVER_URL", appConfig.serverUrl)
-//            putExtra("USERNAME", appConfig.username)
-//            putExtra("SUBSONIC_TOKEN", appConfig.subsonicToken)
-//            putExtra("SUBSONIC_SALT", appConfig.subsonicSalt)
-//            putExtra("AUTH_TOKEN", appConfig.authToken)
         }
         startActivity(intent)
     }

@@ -2,7 +2,6 @@ package com.example.mycarapp.HiltModule
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.mycarapp.HiltModule.AppConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

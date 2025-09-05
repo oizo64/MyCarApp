@@ -1,10 +1,9 @@
 package com.example.mycarapp.HiltModule
 
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.core.content.edit
-import com.example.mycarapp.HiltModule.AppConfig
 
 @Singleton
 class ConfigManagerImpl @Inject constructor(

@@ -12,21 +12,17 @@ class MyCarAppService : CarAppService() {
 
     override fun onCreate() {
         super.onCreate()
-        // Prawidłowe miejsce do inicjalizacji MediaBrowser, ponieważ MyCarAppService jest Service
         mediaBrowser = MediaBrowserCompat(
             this,
             ComponentName(this.packageName, MusicPlaybackService::class.java.name),
             object : MediaBrowserCompat.ConnectionCallback() {
                 override fun onConnected() {
-                    // Połączenie z serwisem muzycznym zostało nawiązane
                 }
 
                 override fun onConnectionSuspended() {
-                    // Połączenie zostało zawieszone
                 }
 
                 override fun onConnectionFailed() {
-                    // Połączenie nie powiodło się
                 }
             },
             null

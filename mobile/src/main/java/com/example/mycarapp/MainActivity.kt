@@ -9,12 +9,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.mycarapp.HiltModule.AppConfig
+import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.activities.AlbumsActivity
 import com.example.mycarapp.controller.ApiService
 import com.example.mycarapp.dto.LoginRequest
-import com.example.mycarapp.HiltModule.AppConfig
-import com.example.mycarapp.HiltModule.AppModule
-import com.example.mycarapp.HiltModule.ConfigManager
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint

@@ -11,11 +11,9 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-// Endpoint logowania, używany do pominięcia nagłówka auth
 const val LOGIN_ENDPOINT = "auth/login"
 const val GET_ALBUMS_ENDPOINT = "api/album"
 
-// Interfejs Retrofit do definiowania wywołań API
 interface ApiService {
     @POST(LOGIN_ENDPOINT)
     suspend fun login(@Body loginRequest: LoginRequest): Response<LoginResponse>
