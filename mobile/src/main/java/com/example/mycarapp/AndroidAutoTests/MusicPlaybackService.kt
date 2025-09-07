@@ -1,10 +1,14 @@
 package com.example.mycarapp.AndroidAutoTests
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,11 +21,11 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
 import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import java.net.HttpURLConnection
 import java.net.URL
 import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
-
 
 class MusicPlaybackService : MediaBrowserServiceCompat() {
 
@@ -30,15 +34,22 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private lateinit var audioManager: AudioManager
     private lateinit var sessionCallback: MediaSessionCallback
     private val mediaItems = mutableListOf<MediaItem>()
-    private val streamUrl = "http://streams.90s90s.de/techno/mp3-192/"
 
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    // Pola do obsługi SharedPreferences
+    private lateinit var sharedPreferences: SharedPreferences
+    companion object {
+        private const val PREFS_NAME = "MusicServicePrefs"
+        private const val KEY_LAST_MEDIA_ID = "last_media_id"
+    }
 
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
-                sessionCallback.onPlay()
+                // Bezpośrednie wywołanie play, aby uniknąć potencjalnej pętli
+                exoPlayer.play()
             }
-
             AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 sessionCallback.onPause()
             }
@@ -74,7 +85,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         Thread {
             try {
                 val url =
-                    URL("https://i.pinimg.com/736x/1e/1e/fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg")
+                    URL("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 5000
                 connection.readTimeout = 5000
@@ -106,51 +117,48 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     override fun onCreate() {
         super.onCreate()
 
-        // 1. Inicjalizacja ExoPlayer
+        sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         exoPlayer = ExoPlayer.Builder(this).build()
-        exoPlayer.playWhenReady = false
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        // KLUCZOWA ZMIANA: Dodanie słuchacza ExoPlayer.Listener, który synchronizuje stan
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .setAudioAttributes(audioAttributes)
+                .build()
+        }
+
         exoPlayer.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    ExoPlayer.STATE_BUFFERING -> {
-                        setPlaybackState(PlaybackStateCompat.STATE_BUFFERING)
-                    }
-
-                    ExoPlayer.STATE_READY -> {
-                        if (exoPlayer.isPlaying) {
-                            setPlaybackState(PlaybackStateCompat.STATE_PLAYING)
-                        } else {
-                            setPlaybackState(PlaybackStateCompat.STATE_PAUSED)
-                        }
-                    }
-
-                    ExoPlayer.STATE_ENDED -> {
-                        setPlaybackState(PlaybackStateCompat.STATE_STOPPED)
-                    }
-
-                    ExoPlayer.STATE_IDLE -> {
-                        setPlaybackState(PlaybackStateCompat.STATE_NONE)
-                    }
+            private fun updatePlaybackState() {
+                val state = when {
+                    exoPlayer.isPlaying -> PlaybackStateCompat.STATE_PLAYING
+                    exoPlayer.playbackState == ExoPlayer.STATE_READY -> PlaybackStateCompat.STATE_PAUSED
+                    exoPlayer.playbackState == ExoPlayer.STATE_BUFFERING -> PlaybackStateCompat.STATE_BUFFERING
+                    exoPlayer.playbackState == ExoPlayer.STATE_ENDED -> PlaybackStateCompat.STATE_STOPPED
+                    else -> PlaybackStateCompat.STATE_NONE
                 }
+                setPlaybackState(state)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                updatePlaybackState()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                // Dodatkowe zabezpieczenie na zmianę stanu odtwarzania
-                if (exoPlayer.playbackState == ExoPlayer.STATE_READY) {
-                    if (isPlaying) {
-                        setPlaybackState(PlaybackStateCompat.STATE_PLAYING)
-                    } else {
-                        setPlaybackState(PlaybackStateCompat.STATE_PAUSED)
-                    }
-                }
+                updatePlaybackState()
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e("MusicService", "ExoPlayer Error: ", error)
             }
         })
 
         sessionCallback = MediaSessionCallback()
 
-        // 2. Inicjalizacja MediaSessionCompat
         mediaSession = MediaSessionCompat(baseContext, "MusicPlaybackService").apply {
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
@@ -160,13 +168,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             setSessionToken(sessionToken)
         }
 
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-        // 3. Ustawienie POCZĄTKOWEGO STANU na PAUSED
-        setPlaybackState(PlaybackStateCompat.STATE_PAUSED)
-
         createMediaItems()
         updateMediaSessionMetadata()
+        prepareLastPlayedOrDefault()
     }
 
     override fun onGetRoot(
@@ -174,7 +178,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         clientUid: Int,
         rootHints: Bundle?
     ): BrowserRoot {
-        // KLUCZOWY KROK: Aktywacja sesji multimediów.
         mediaSession.isActive = true
         return BrowserRoot("root_id", null)
     }
@@ -202,41 +205,31 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         super.onDestroy()
         exoPlayer.release()
         mediaSession.release()
-        audioManager.abandonAudioFocus(audioFocusChangeListener)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
     }
 
     private fun setPlaybackState(@PlaybackStateCompat.State state: Int) {
         val actions = when (state) {
             PlaybackStateCompat.STATE_PLAYING -> {
-                // GRA - pokaż PAUSE, STOP, SKIP
                 PlaybackStateCompat.ACTION_PAUSE or
                         PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                        PlaybackStateCompat.ACTION_SEEK_TO
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE
             }
-
             PlaybackStateCompat.STATE_PAUSED -> {
-                // PAUZA - pokaż PLAY, STOP, SKIP
                 PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                        PlaybackStateCompat.ACTION_SEEK_TO
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE
             }
-
             PlaybackStateCompat.STATE_STOPPED -> {
-                // STOP - pokaż PLAY, SKIP
                 PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE
             }
-
             else -> {
-                // Dla innych stanów
                 PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PAUSE or
                         PlaybackStateCompat.ACTION_STOP or
@@ -253,41 +246,82 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         Log.d("MusicService", "Playback state set to: $state")
     }
 
+    private fun preparePlayer(mediaId: String) {
+        val mediaUri = mediaItems.find { it.mediaId == mediaId }?.description?.mediaUri
+        if (mediaUri != null) {
+            val exoPlayerItem = ExoPlayerMediaItem.Builder()
+                .setUri(mediaUri)
+                .build()
+            exoPlayer.setMediaItem(exoPlayerItem)
+            exoPlayer.prepare()
+            Log.d("MusicService", "Player prepared for mediaId: $mediaId")
+        } else {
+            Log.w("MusicService", "Could not find media item for mediaId: $mediaId")
+        }
+    }
+
+    private fun prepareLastPlayedOrDefault() {
+        val lastMediaId = sharedPreferences.getString(KEY_LAST_MEDIA_ID, null)
+        if (lastMediaId != null) {
+            preparePlayer(lastMediaId)
+        } else if (mediaItems.isNotEmpty()) {
+            val firstMediaId = mediaItems.first().mediaId!!
+            preparePlayer(firstMediaId)
+        } else {
+            Log.w("MusicService", "Media item list is empty, cannot prepare player.")
+        }
+    }
+
     inner class MediaSessionCallback : MediaSessionCompat.Callback() {
         override fun onPlay() {
-            val result = audioManager.requestAudioFocus(
-                audioFocusChangeListener,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN
-            )
+            val result: Int
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                result = audioFocusRequest?.let {
+                    audioManager.requestAudioFocus(it)
+                } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
+            } else {
+                @Suppress("DEPRECATION")
+                result = audioManager.requestAudioFocus(
+                    audioFocusChangeListener,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN
+                )
+            }
+
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                 exoPlayer.play()
-                // Stan zostanie zaktualizowany przez listenera ExoPlayera
             }
         }
 
         override fun onPause() {
             exoPlayer.pause()
-            audioManager.abandonAudioFocus(audioFocusChangeListener)
-            // Stan zostanie zaktualizowany przez listenera ExoPlayera
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(audioFocusChangeListener)
+            }
         }
 
         override fun onStop() {
             exoPlayer.stop()
-            audioManager.abandonAudioFocus(audioFocusChangeListener)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(audioFocusChangeListener)
+            }
             setPlaybackState(PlaybackStateCompat.STATE_STOPPED)
         }
 
         override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-            val mediaUri = mediaItems.find { it.mediaId == mediaId }?.description?.mediaUri
-            if (mediaUri != null) {
-                val exoPlayerItem = ExoPlayerMediaItem.Builder()
-                    .setUri(mediaUri)
-                    .build()
-                exoPlayer.setMediaItem(exoPlayerItem)
-                exoPlayer.prepare()
-                onPlay()
-            }
+            mediaId ?: return
+
+            sharedPreferences.edit().putString(KEY_LAST_MEDIA_ID, mediaId).apply()
+            Log.d("MusicService", "Saved last mediaId: $mediaId")
+
+            preparePlayer(mediaId)
+            onPlay()
         }
     }
 }
