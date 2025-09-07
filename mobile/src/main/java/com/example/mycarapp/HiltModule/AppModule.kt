@@ -1,3 +1,4 @@
+// AppModule.kt
 package com.example.mycarapp.HiltModule
 
 import android.content.Context
@@ -21,13 +22,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideConfigManager(sharedPreferences: SharedPreferences): ConfigManager {
-        return ConfigManagerImpl(sharedPreferences)
-    }
-
-    @Provides
-    @Singleton
-    fun provideAppConfig(configManager: ConfigManager): AppConfig {
-        return configManager.getConfig()
+    fun provideConfigManager(impl: ConfigManagerImpl): ConfigManager {
+        return impl
     }
 }

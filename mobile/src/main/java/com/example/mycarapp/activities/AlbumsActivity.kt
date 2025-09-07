@@ -92,6 +92,7 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
             try {
                 val unsortedAlbumsList = albumsRepository.getAlbums()
                 val sortedAlbumsList = sortAlbumsByDate(unsortedAlbumsList)
+                configManager.getConfig().sortedAlbums = sortedAlbumsList // Użyj singletonu
                 updateUIWithAlbums(sortedAlbumsList)
             } catch (e: Exception) {
                 showErrorState(e.message)

@@ -141,13 +141,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleSuccessfulLogin(loginResult: LoginResponse, serverUrl: String, username: String) {
-        val appConfig = AppConfig(
-            authToken = loginResult.token,
-            subsonicSalt = loginResult.subsonicSalt,
-            subsonicToken = loginResult.subsonicToken,
-            serverUrl = serverUrl,
-            username = username
-        )
+        // Pobierz instancję AppConfig z Hilt (to jest singleton)
+        val appConfig = configManager.getConfig()
+
+        // Zaktualizuj pola w instancji singletonu
+        appConfig.authToken = loginResult.token
+        appConfig.subsonicSalt = loginResult.subsonicSalt
+        appConfig.subsonicToken = loginResult.subsonicToken
+        appConfig.serverUrl = serverUrl
+        appConfig.username = username
+
+        // Zapisz zaktualizowane dane do SharedPreferences za pomocą metody updateConfig
         configManager.updateConfig(appConfig)
 
         runOnUiThread {

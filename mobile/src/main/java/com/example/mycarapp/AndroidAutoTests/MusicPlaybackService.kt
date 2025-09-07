@@ -20,14 +20,23 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
+import com.example.mycarapp.HiltModule.AppConfig
+import com.example.mycarapp.HiltModule.ConfigManager
+import com.example.mycarapp.Repository.RemoteAlbumsRepository
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
+import dagger.hilt.android.AndroidEntryPoint
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.inject.Inject
 import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
 
+@AndroidEntryPoint
 class MusicPlaybackService : MediaBrowserServiceCompat() {
+
+    @Inject
+    lateinit var configManager: ConfigManager
 
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var exoPlayer: ExoPlayer
@@ -36,6 +45,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private val mediaItems = mutableListOf<MediaItem>()
 
     private var audioFocusRequest: AudioFocusRequest? = null
+
+    private lateinit var appConfig: AppConfig
+
 
     // Pola do obsługi SharedPreferences
     private lateinit var sharedPreferences: SharedPreferences
@@ -116,7 +128,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     override fun onCreate() {
         super.onCreate()
-
+        appConfig = configManager.getConfig()
         sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         exoPlayer = ExoPlayer.Builder(this).build()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -183,15 +195,29 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private fun createMediaItems() {
-        val song1 = MediaDescriptionCompat.Builder()
-            .setMediaId("song_1")
-            .setTitle("90s90s Techno")
-            .setSubtitle("90s90s")
-            .setMediaUri(Uri.parse("http://streams.90s90s.de/techno/mp3-192/"))
-            .build()
-
+        val sortedAlbums = appConfig.sortedAlbums
         mediaItems.clear()
-        mediaItems.add(MediaItem(song1, FLAG_PLAYABLE))
+
+        // Stworzenie MediaItem dla każdego albumu z posortowanej listy
+        sortedAlbums.forEach { album ->
+            val description = MediaDescriptionCompat.Builder()
+                .setMediaId(album.id)
+                .setTitle(album.name)
+                // Możesz dodać inne metadane, jeśli są dostępne w obiekcie Album
+                .build()
+
+            mediaItems.add(MediaItem(description, FLAG_PLAYABLE))
+        }
+
+        if (mediaItems.isEmpty()) {
+            // Dodanie domyślnego elementu, jeśli lista albumów jest pusta
+            val defaultDescription = MediaDescriptionCompat.Builder()
+                .setMediaId("default_item")
+                .setTitle("Brak albumów")
+                .setSubtitle("Lista jest pusta")
+                .build()
+            mediaItems.add(MediaItem(defaultDescription, FLAG_PLAYABLE))
+        }
     }
 
     override fun onLoadChildren(

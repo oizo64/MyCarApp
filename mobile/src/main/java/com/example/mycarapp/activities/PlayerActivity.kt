@@ -208,7 +208,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun createApiService(baseUrl: String, authToken: String): ApiService {
+    fun createApiService(baseUrl: String, authToken: String): ApiService {
         val authInterceptor = Interceptor { chain ->
             val originalRequest = chain.request()
             val modifiedRequest = originalRequest.newBuilder()
