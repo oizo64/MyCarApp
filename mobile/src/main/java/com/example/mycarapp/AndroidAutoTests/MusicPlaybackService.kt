@@ -22,7 +22,6 @@ import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
 import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
-import com.example.mycarapp.Repository.RemoteAlbumsRepository
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
@@ -31,6 +30,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
+import androidx.core.net.toUri
+import androidx.core.content.edit
 
 @AndroidEntryPoint
 class MusicPlaybackService : MediaBrowserServiceCompat() {
@@ -48,47 +49,22 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private lateinit var appConfig: AppConfig
 
-
-    // Pola do obsługi SharedPreferences
     private lateinit var sharedPreferences: SharedPreferences
+
     companion object {
         private const val PREFS_NAME = "MusicServicePrefs"
         private const val KEY_LAST_MEDIA_ID = "last_media_id"
+        const val STREAM_URL = "http://streams.90s90s.de/techno/mp3-192/"
     }
 
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
-                // Bezpośrednie wywołanie play, aby uniknąć potencjalnej pętli
                 exoPlayer.play()
             }
+
             AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 sessionCallback.onPause()
-            }
-        }
-    }
-
-    private fun updateMediaSessionMetadata() {
-        val metadataBuilder = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "90s90s Techno")
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "90s90s")
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "90s90s Radio")
-            .putString(
-                MediaMetadataCompat.METADATA_KEY_MEDIA_URI,
-                "http://streams.90s90s.de/techno/mp3-192/"
-            )
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
-
-        // Ustaw tymczasowe metadane bez obrazka
-        mediaSession.setMetadata(metadataBuilder.build())
-
-        // Pobierz obrazek w tle i zaktualizuj metadane
-        loadAlbumArtAsync { bitmap ->
-            bitmap?.let {
-                val updatedMetadata = MediaMetadataCompat.Builder(mediaSession.controller.metadata)
-                    .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
-                    .build()
-                mediaSession.setMetadata(updatedMetadata)
             }
         }
     }
@@ -133,16 +109,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         exoPlayer = ExoPlayer.Builder(this).build()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build()
-            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setOnAudioFocusChangeListener(audioFocusChangeListener)
-                .setAudioAttributes(audioAttributes)
-                .build()
-        }
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+        audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setOnAudioFocusChangeListener(audioFocusChangeListener)
+            .setAudioAttributes(audioAttributes)
+            .build()
 
         exoPlayer.addListener(object : Player.Listener {
             private fun updatePlaybackState() {
@@ -181,7 +155,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
 
         createMediaItems()
-        updateMediaSessionMetadata()
         prepareLastPlayedOrDefault()
     }
 
@@ -198,23 +171,22 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         val sortedAlbums = appConfig.sortedAlbums
         mediaItems.clear()
 
-        // Stworzenie MediaItem dla każdego albumu z posortowanej listy
         sortedAlbums.forEach { album ->
             val description = MediaDescriptionCompat.Builder()
                 .setMediaId(album.id)
                 .setTitle(album.name)
-                // Możesz dodać inne metadane, jeśli są dostępne w obiekcie Album
+                .setMediaUri(STREAM_URL.toUri())
                 .build()
 
             mediaItems.add(MediaItem(description, FLAG_PLAYABLE))
         }
 
         if (mediaItems.isEmpty()) {
-            // Dodanie domyślnego elementu, jeśli lista albumów jest pusta
             val defaultDescription = MediaDescriptionCompat.Builder()
                 .setMediaId("default_item")
                 .setTitle("Brak albumów")
                 .setSubtitle("Lista jest pusta")
+                .setMediaUri(STREAM_URL.toUri())
                 .build()
             mediaItems.add(MediaItem(defaultDescription, FLAG_PLAYABLE))
         }
@@ -231,12 +203,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         super.onDestroy()
         exoPlayer.release()
         mediaSession.release()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(audioFocusChangeListener)
-        }
+        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
     }
 
     private fun setPlaybackState(@PlaybackStateCompat.State state: Int) {
@@ -246,15 +213,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                         PlaybackStateCompat.ACTION_STOP or
                         PlaybackStateCompat.ACTION_PLAY_PAUSE
             }
+
             PlaybackStateCompat.STATE_PAUSED -> {
                 PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_STOP or
                         PlaybackStateCompat.ACTION_PLAY_PAUSE
             }
+
             PlaybackStateCompat.STATE_STOPPED -> {
                 PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PLAY_PAUSE
             }
+
             else -> {
                 PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PAUSE or
@@ -301,18 +271,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     inner class MediaSessionCallback : MediaSessionCompat.Callback() {
         override fun onPlay() {
             val result: Int
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                result = audioFocusRequest?.let {
-                    audioManager.requestAudioFocus(it)
-                } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
-            } else {
-                @Suppress("DEPRECATION")
-                result = audioManager.requestAudioFocus(
-                    audioFocusChangeListener,
-                    AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN
-                )
-            }
+            result = audioFocusRequest?.let {
+                audioManager.requestAudioFocus(it)
+            } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
 
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                 exoPlayer.play()
@@ -321,29 +282,43 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         override fun onPause() {
             exoPlayer.pause()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager.abandonAudioFocus(audioFocusChangeListener)
-            }
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
         }
 
         override fun onStop() {
             exoPlayer.stop()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager.abandonAudioFocus(audioFocusChangeListener)
-            }
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
             setPlaybackState(PlaybackStateCompat.STATE_STOPPED)
         }
 
         override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
             mediaId ?: return
 
-            sharedPreferences.edit().putString(KEY_LAST_MEDIA_ID, mediaId).apply()
+            val selectedMediaItem = mediaItems.find { it.mediaId == mediaId }
+            selectedMediaItem?.let {
+                val metadataBuilder = MediaMetadataCompat.Builder()
+                    .putString(
+                        MediaMetadataCompat.METADATA_KEY_TITLE,
+                        it.description.title.toString()
+                    )
+                    .putString(
+                        MediaMetadataCompat.METADATA_KEY_ARTIST,
+                        it.description.subtitle.toString()
+                    ) // Przykładowo, jeśli masz artystę
+                    .putString(
+                        MediaMetadataCompat.METADATA_KEY_ALBUM,
+                        it.description.title.toString()
+                    ) // Album to nazwa utworu, zgodnie z prośbą
+                    .putString(
+                        MediaMetadataCompat.METADATA_KEY_MEDIA_URI,
+                        it.description.mediaUri.toString()
+                    )
+                    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
+
+                mediaSession.setMetadata(metadataBuilder.build())
+            }
+
+            sharedPreferences.edit { putString(KEY_LAST_MEDIA_ID, mediaId) }
             Log.d("MusicService", "Saved last mediaId: $mediaId")
 
             preparePlayer(mediaId)
