@@ -2,16 +2,10 @@ package com.example.mycarapp.AndroidAutoTests
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
 import android.support.v4.media.MediaDescriptionCompat
@@ -19,19 +13,20 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.media.MediaBrowserServiceCompat
 import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
+import com.example.mycarapp.utils.StreamUrlGenerator
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
-import java.net.HttpURLConnection
-import java.net.URL
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
-import androidx.core.net.toUri
-import androidx.core.content.edit
+
 
 @AndroidEntryPoint
 class MusicPlaybackService : MediaBrowserServiceCompat() {
@@ -40,7 +35,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     lateinit var configManager: ConfigManager
 
     private lateinit var mediaSession: MediaSessionCompat
-    private lateinit var exoPlayer: ExoPlayer
+    private lateinit var exoPlayer: Player
     private lateinit var audioManager: AudioManager
     private lateinit var sessionCallback: MediaSessionCallback
     private val mediaItems = mutableListOf<MediaItem>()
@@ -50,6 +45,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private lateinit var appConfig: AppConfig
 
     private lateinit var sharedPreferences: SharedPreferences
+
+    @Inject
+    lateinit var streamUrlGenerator: StreamUrlGenerator // Hilt dostarczy zainicjalizowany generator
 
     companion object {
         private const val PREFS_NAME = "MusicServicePrefs"
@@ -67,39 +65,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 sessionCallback.onPause()
             }
         }
-    }
-
-    private fun loadAlbumArtAsync(callback: (Bitmap?) -> Unit) {
-        Thread {
-            try {
-                val url =
-                    URL("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                connection.doInput = true
-                connection.connect()
-
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                    val input = connection.inputStream
-                    val bitmap = BitmapFactory.decodeStream(input)
-                    input.close()
-
-                    Handler(Looper.getMainLooper()).post {
-                        callback(bitmap)
-                    }
-                } else {
-                    Handler(Looper.getMainLooper()).post {
-                        callback(null)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MusicService", "Error loading album art: ${e.message}")
-                Handler(Looper.getMainLooper()).post {
-                    callback(null)
-                }
-            }
-        }.start()
     }
 
     override fun onCreate() {
@@ -172,10 +137,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         mediaItems.clear()
 
         sortedAlbums.forEach { album ->
+            val streamUrlForAlbum =
+                runBlocking { // Use runBlocking ONLY if absolutely necessary and you understand its implications.
+                    // Better to avoid if possible and use async/await.
+                    streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id)
+                }
+
             val description = MediaDescriptionCompat.Builder()
                 .setMediaId(album.id)
                 .setTitle(album.name)
-                .setMediaUri(STREAM_URL.toUri())
+                .setMediaUri(streamUrlForAlbum?.toUri())
+                .setIconUri(album.coverArtUrl?.toUri()) // Ustaw URI obrazka
                 .build()
 
             mediaItems.add(MediaItem(description, FLAG_PLAYABLE))
@@ -187,6 +159,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .setTitle("Brak albumów")
                 .setSubtitle("Lista jest pusta")
                 .setMediaUri(STREAM_URL.toUri())
+                .setIconUri("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri()) // Ustaw URI obrazka
                 .build()
             mediaItems.add(MediaItem(defaultDescription, FLAG_PLAYABLE))
         }
@@ -314,6 +287,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                         it.description.mediaUri.toString()
                     )
                     .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
+                val artworkUri = it.description.iconUri // Z MediaItem description
+                if (artworkUri != null) {
+                    metadataBuilder.putString(
+                        MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI,
+                        artworkUri.toString()
+                    )
+                }
 
                 mediaSession.setMetadata(metadataBuilder.build())
             }

@@ -21,17 +21,10 @@ import coil.transform.RoundedCornersTransformation
 import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.R
-import com.example.mycarapp.controller.ApiService
 import com.example.mycarapp.dto.Album
+import com.example.mycarapp.utils.StreamUrlGenerator
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.Interceptor
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,6 +48,9 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var albumArtistTextView: TextView
     private lateinit var albumCreatedTextView: TextView
 
+    lateinit var serverUrl: String
+    lateinit var authToken: String
+
     private lateinit var appConfig: AppConfig
     private var isPlayingSong = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())
@@ -62,6 +58,9 @@ class PlayerActivity : AppCompatActivity() {
     private var totalDuration: Long = 0
     private var streamUrl: String? = null
     private val SKIP_TIME_MS = 60000
+
+    @Inject
+    lateinit var streamUrlGenerator: StreamUrlGenerator // Hilt dostarczy zainicjalizowany generator
 
     private val updateSeekBarRunnable = object : Runnable {
         override fun run() {
@@ -183,54 +182,24 @@ class PlayerActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val apiService = createApiService(serverUrl, authToken)
-                val response = withContext(Dispatchers.IO) {
-                    apiService.getSongsForAlbum(album.id)
-                }
+                streamUrl =
+                    streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id);
 
-                if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                    val firstSong = response.body()!!.first()
-                    val playedSongId = firstSong.id
-                    streamUrl =
-                        "$serverUrl/rest/stream?u=$username&t=$subsonicToken&s=$subsonicSalt&v=1.8.0&c=NavidromeUI&id=$playedSongId"
-
-                    runOnUiThread {
-                        playPauseButton.isEnabled = true
-                    }
-                } else {
-                    Log.e("PlayerActivity", "Pusta lista piosenek lub null body: ${response.code()}")
-                    Toast.makeText(this@PlayerActivity, "Brak piosenek do odtworzenia.", Toast.LENGTH_SHORT).show()
+                runOnUiThread {
+                    playPauseButton.isEnabled = true
                 }
             } catch (e: Exception) {
-                Log.e("PlayerScreen", "Błąd podczas pobierania szczegółów piosenki: ${e.message}", e)
-                Toast.makeText(this@PlayerActivity, "Błąd sieci: ${e.message}", Toast.LENGTH_SHORT).show()
+                Log.e(
+                    "PlayerScreen",
+                    "Błąd podczas pobierania szczegółów piosenki: ${e.message}",
+                    e
+                )
+                Toast.makeText(this@PlayerActivity, "Błąd sieci: ${e.message}", Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
 
-    fun createApiService(baseUrl: String, authToken: String): ApiService {
-        val authInterceptor = Interceptor { chain ->
-            val originalRequest = chain.request()
-            val modifiedRequest = originalRequest.newBuilder()
-                .header("X-ND-Authorization", "Bearer $authToken")
-                .build()
-            chain.proceed(modifiedRequest)
-        }
-
-        val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .addInterceptor(authInterceptor)
-            .build()
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl("$baseUrl/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        return retrofit.create(ApiService::class.java)
-    }
 
     private fun togglePlayback() {
         if (isPlayingSong.get()) {
@@ -238,7 +207,8 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             streamUrl?.let { startPlayback(it) } ?: run {
                 Log.e("PlayerActivity", "Stream URL nie jest jeszcze dostępny")
-                Toast.makeText(this, "Poczekaj, aż piosenka się załaduje.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Poczekaj, aż piosenka się załaduje.", Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
