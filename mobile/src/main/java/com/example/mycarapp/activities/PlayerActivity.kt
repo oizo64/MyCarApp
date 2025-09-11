@@ -48,9 +48,6 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var albumArtistTextView: TextView
     private lateinit var albumCreatedTextView: TextView
 
-    lateinit var serverUrl: String
-    lateinit var authToken: String
-
     private lateinit var appConfig: AppConfig
     private var isPlayingSong = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())

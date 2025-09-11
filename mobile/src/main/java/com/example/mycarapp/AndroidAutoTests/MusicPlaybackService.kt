@@ -24,6 +24,7 @@ import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
 
@@ -47,22 +48,32 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private lateinit var sharedPreferences: SharedPreferences
 
     @Inject
-    lateinit var streamUrlGenerator: StreamUrlGenerator // Hilt dostarczy zainicjalizowany generator
+    lateinit var streamUrlGenerator: StreamUrlGenerator
 
     companion object {
         private const val PREFS_NAME = "MusicServicePrefs"
         private const val KEY_LAST_MEDIA_ID = "last_media_id"
         const val STREAM_URL = "http://streams.90s90s.de/techno/mp3-192/"
+        private val SEEK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(60) // 60 sekund
     }
 
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
-                exoPlayer.play()
+                if (mediaSession.controller.playbackState?.state == PlaybackStateCompat.STATE_PLAYING) {
+                    exoPlayer.play()
+                }
             }
-
-            AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+            AudioManager.AUDIOFOCUS_LOSS -> {
                 sessionCallback.onPause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                if (exoPlayer.isPlaying) {
+                    sessionCallback.onPause()
+                }
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // Można obsłużyć ducking
             }
         }
     }
@@ -87,9 +98,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             private fun updatePlaybackState() {
                 val state = when {
                     exoPlayer.isPlaying -> PlaybackStateCompat.STATE_PLAYING
-                    exoPlayer.playbackState == ExoPlayer.STATE_READY -> PlaybackStateCompat.STATE_PAUSED
-                    exoPlayer.playbackState == ExoPlayer.STATE_BUFFERING -> PlaybackStateCompat.STATE_BUFFERING
-                    exoPlayer.playbackState == ExoPlayer.STATE_ENDED -> PlaybackStateCompat.STATE_STOPPED
+                    exoPlayer.playbackState == Player.STATE_READY && !exoPlayer.playWhenReady -> PlaybackStateCompat.STATE_PAUSED
+                    exoPlayer.playbackState == Player.STATE_BUFFERING -> PlaybackStateCompat.STATE_BUFFERING
+                    exoPlayer.playbackState == Player.STATE_ENDED -> PlaybackStateCompat.STATE_STOPPED
                     else -> PlaybackStateCompat.STATE_NONE
                 }
                 setPlaybackState(state)
@@ -105,6 +116,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.e("MusicService", "ExoPlayer Error: ", error)
+                setPlaybackState(PlaybackStateCompat.STATE_ERROR)
             }
         })
 
@@ -120,7 +132,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
 
         createMediaItems()
-        prepareLastPlayedOrDefault()
+        prepareLastPlayedOrDefault(playWhenReady = false)
+        setPlaybackState(PlaybackStateCompat.STATE_PAUSED)
     }
 
     override fun onGetRoot(
@@ -138,8 +151,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         sortedAlbums.forEach { album ->
             val streamUrlForAlbum =
-                runBlocking { // Use runBlocking ONLY if absolutely necessary and you understand its implications.
-                    // Better to avoid if possible and use async/await.
+                runBlocking {
                     streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id)
                 }
 
@@ -147,7 +159,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .setMediaId(album.id)
                 .setTitle(album.name)
                 .setMediaUri(streamUrlForAlbum?.toUri())
-                .setIconUri(album.coverArtUrl?.toUri()) // Ustaw URI obrazka
+                .setIconUri(album.coverArtUrl?.toUri())
                 .build()
 
             mediaItems.add(MediaItem(description, FLAG_PLAYABLE))
@@ -159,7 +171,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .setTitle("Brak albumów")
                 .setSubtitle("Lista jest pusta")
                 .setMediaUri(STREAM_URL.toUri())
-                .setIconUri("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri()) // Ustaw URI obrazka
+                .setIconUri("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri())
                 .build()
             mediaItems.add(MediaItem(defaultDescription, FLAG_PLAYABLE))
         }
@@ -169,140 +181,213 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         parentId: String,
         result: Result<MutableList<MediaItem>>
     ) {
-        result.sendResult(mediaItems)
+        if (parentId == "root_id") {
+            result.sendResult(mediaItems)
+        } else {
+            result.sendResult(null)
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        mediaSession.isActive = false
         exoPlayer.release()
         mediaSession.release()
         audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
     }
 
     private fun setPlaybackState(@PlaybackStateCompat.State state: Int) {
-        val actions = when (state) {
-            PlaybackStateCompat.STATE_PLAYING -> {
-                PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE
-            }
+        val currentPosition = exoPlayer.currentPosition
+        val actions = getAvailableActions(state)
 
-            PlaybackStateCompat.STATE_PAUSED -> {
-                PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE
-            }
+        val playbackStateBuilder = PlaybackStateCompat.Builder()
+            .setState(state, currentPosition, 1.0f)
+            .setActions(actions)
 
-            PlaybackStateCompat.STATE_STOPPED -> {
-                PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE
-            }
+        if (state == PlaybackStateCompat.STATE_ERROR) {
+            playbackStateBuilder.setErrorMessage(PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR, "Wystąpił błąd odtwarzania")
+        }
 
-            else -> {
-                PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE
+        mediaSession.setPlaybackState(playbackStateBuilder.build())
+        Log.d("MusicService", "Playback state set to: $state at position $currentPosition")
+    }
+
+    private fun getAvailableActions(@PlaybackStateCompat.State state: Int): Long {
+        var actions = (
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                        // Zmieniamy znaczenie tych przycisków na przewijanie
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                        PlaybackStateCompat.ACTION_STOP
+                )
+        if (state == PlaybackStateCompat.STATE_PLAYING || state == PlaybackStateCompat.STATE_PAUSED) {
+            // Dodajemy ACTION_SEEK_TO, jeśli odtwarzacz może przewijać
+            if (exoPlayer.isCurrentMediaItemSeekable) {
+                actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
             }
         }
 
-        val playbackState = PlaybackStateCompat.Builder()
-            .setState(state, exoPlayer.currentPosition, 1.0f)
-            .setActions(actions)
-            .build()
-        mediaSession.setPlaybackState(playbackState)
-
-        Log.d("MusicService", "Playback state set to: $state")
+        actions = when (state) {
+            PlaybackStateCompat.STATE_PLAYING -> actions or PlaybackStateCompat.ACTION_PAUSE
+            PlaybackStateCompat.STATE_PAUSED,
+            PlaybackStateCompat.STATE_STOPPED,
+            PlaybackStateCompat.STATE_NONE -> actions or PlaybackStateCompat.ACTION_PLAY
+            else -> actions
+        }
+        return actions
     }
 
-    private fun preparePlayer(mediaId: String) {
-        val mediaUri = mediaItems.find { it.mediaId == mediaId }?.description?.mediaUri
+
+    private fun preparePlayer(mediaId: String, playWhenReady: Boolean) {
+        val mediaItem = mediaItems.find { it.mediaId == mediaId }
+        val mediaUri = mediaItem?.description?.mediaUri
+
         if (mediaUri != null) {
             val exoPlayerItem = ExoPlayerMediaItem.Builder()
                 .setUri(mediaUri)
+                .setMediaId(mediaId)
                 .build()
             exoPlayer.setMediaItem(exoPlayerItem)
+            exoPlayer.playWhenReady = playWhenReady
             exoPlayer.prepare()
-            Log.d("MusicService", "Player prepared for mediaId: $mediaId")
+
+            mediaItem.description.let { description ->
+                val metadataBuilder = MediaMetadataCompat.Builder()
+                    .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, description.mediaId)
+                    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, description.title?.toString())
+                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, description.subtitle?.toString())
+                    .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, description.title?.toString())
+                    .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, description.mediaUri?.toString())
+                    // Ustaw czas trwania, jeśli jest znany, w przeciwnym razie -1 dla strumieni
+                    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, if (exoPlayer.duration > 0) exoPlayer.duration else -1L)
+                description.iconUri?.let {
+                    metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, it.toString())
+                    metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, it.toString())
+                }
+                mediaSession.setMetadata(metadataBuilder.build())
+            }
+
+            Log.d("MusicService", "Player prepared for mediaId: $mediaId, playWhenReady: $playWhenReady")
         } else {
             Log.w("MusicService", "Could not find media item for mediaId: $mediaId")
+            setPlaybackState(PlaybackStateCompat.STATE_ERROR)
         }
     }
 
-    private fun prepareLastPlayedOrDefault() {
+    private fun prepareLastPlayedOrDefault(playWhenReady: Boolean) {
         val lastMediaId = sharedPreferences.getString(KEY_LAST_MEDIA_ID, null)
-        if (lastMediaId != null) {
-            preparePlayer(lastMediaId)
+        val mediaIdToPrepare = if (lastMediaId != null && mediaItems.any { it.mediaId == lastMediaId }) {
+            lastMediaId
         } else if (mediaItems.isNotEmpty()) {
-            val firstMediaId = mediaItems.first().mediaId!!
-            preparePlayer(firstMediaId)
+            mediaItems.first().mediaId
+        } else {
+            null
+        }
+
+        if (mediaIdToPrepare != null) {
+            preparePlayer(mediaIdToPrepare, playWhenReady)
         } else {
             Log.w("MusicService", "Media item list is empty, cannot prepare player.")
+            setPlaybackState(PlaybackStateCompat.STATE_NONE)
         }
     }
 
     inner class MediaSessionCallback : MediaSessionCompat.Callback() {
         override fun onPlay() {
-            val result: Int
-            result = audioFocusRequest?.let {
-                audioManager.requestAudioFocus(it)
-            } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
-
-            if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                exoPlayer.play()
+            Log.d("MusicService", "onPlay called")
+            if (exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.currentMediaItem == null) {
+                Log.d("MusicService", "Player not ready or no media item, preparing last played or default.")
+                prepareLastPlayedOrDefault(playWhenReady = true)
+            } else if (exoPlayer.playbackState == Player.STATE_ENDED) {
+                exoPlayer.seekTo(0)
+                exoPlayer.playWhenReady = true
+            } else {
+                val result = audioFocusRequest?.let { audioManager.requestAudioFocus(it) } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
+                if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    exoPlayer.playWhenReady = true
+                    mediaSession.isActive = true
+                } else {
+                    Log.w("MusicService", "Audio focus request failed")
+                }
             }
         }
 
         override fun onPause() {
-            exoPlayer.pause()
-            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            Log.d("MusicService", "onPause called")
+            exoPlayer.playWhenReady = false
         }
 
         override fun onStop() {
+            Log.d("MusicService", "onStop called")
             exoPlayer.stop()
+            exoPlayer.clearMediaItems()
             audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            mediaSession.isActive = false
             setPlaybackState(PlaybackStateCompat.STATE_STOPPED)
         }
 
         override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
             mediaId ?: return
-
-            val selectedMediaItem = mediaItems.find { it.mediaId == mediaId }
-            selectedMediaItem?.let {
-                val metadataBuilder = MediaMetadataCompat.Builder()
-                    .putString(
-                        MediaMetadataCompat.METADATA_KEY_TITLE,
-                        it.description.title.toString()
-                    )
-                    .putString(
-                        MediaMetadataCompat.METADATA_KEY_ARTIST,
-                        it.description.subtitle.toString()
-                    ) // Przykładowo, jeśli masz artystę
-                    .putString(
-                        MediaMetadataCompat.METADATA_KEY_ALBUM,
-                        it.description.title.toString()
-                    ) // Album to nazwa utworu, zgodnie z prośbą
-                    .putString(
-                        MediaMetadataCompat.METADATA_KEY_MEDIA_URI,
-                        it.description.mediaUri.toString()
-                    )
-                    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
-                val artworkUri = it.description.iconUri // Z MediaItem description
-                if (artworkUri != null) {
-                    metadataBuilder.putString(
-                        MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI,
-                        artworkUri.toString()
-                    )
-                }
-
-                mediaSession.setMetadata(metadataBuilder.build())
-            }
+            Log.d("MusicService", "onPlayFromMediaId called with mediaId: $mediaId")
 
             sharedPreferences.edit { putString(KEY_LAST_MEDIA_ID, mediaId) }
             Log.d("MusicService", "Saved last mediaId: $mediaId")
 
-            preparePlayer(mediaId)
-            onPlay()
+            preparePlayer(mediaId, playWhenReady = true)
+            val result = audioFocusRequest?.let { audioManager.requestAudioFocus(it) } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
+            if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                mediaSession.isActive = true
+            } else {
+                Log.w("MusicService", "Audio focus request failed for onPlayFromMediaId")
+                exoPlayer.playWhenReady = false
+            }
+        }
+
+        override fun onSeekTo(pos: Long) {
+            if (exoPlayer.isCurrentMediaItemSeekable) {
+                Log.d("MusicService", "onSeekTo called with position: $pos")
+                exoPlayer.seekTo(pos)
+                // Stan odtwarzania zostanie zaktualizowany przez listener ExoPlayera
+                // Ale możemy go zaktualizować od razu, aby UI szybciej zareagowało
+                setPlaybackState(mediaSession.controller.playbackState.state)
+            } else {
+                Log.w("MusicService", "Current media item is not seekable.")
+            }
+        }
+
+        override fun onSkipToNext() {
+            Log.d("MusicService", "onSkipToNext (seek forward) called")
+            if (exoPlayer.isCurrentMediaItemSeekable) {
+                var newPosition = exoPlayer.currentPosition + SEEK_INTERVAL_MS
+                val duration = exoPlayer.duration
+                if (duration > 0 && newPosition > duration) { // Upewnij się, że duration jest dostępne
+                    newPosition = duration
+                }
+                exoPlayer.seekTo(newPosition)
+                // Aktualizuj stan, aby odzwierciedlić nową pozycję
+                setPlaybackState(mediaSession.controller.playbackState.state)
+            } else {
+                Log.w("MusicService", "Cannot skip next, media item not seekable or not playing.")
+                // Opcjonalnie: przejdź do następnego utworu, jeśli przewijanie nie jest możliwe
+                // super.onSkipToNext()
+            }
+        }
+
+        override fun onSkipToPrevious() {
+            Log.d("MusicService", "onSkipToPrevious (seek backward) called")
+            if (exoPlayer.isCurrentMediaItemSeekable) {
+                var newPosition = exoPlayer.currentPosition - SEEK_INTERVAL_MS
+                if (newPosition < 0) {
+                    newPosition = 0
+                }
+                exoPlayer.seekTo(newPosition)
+                // Aktualizuj stan, aby odzwierciedlić nową pozycję
+                setPlaybackState(mediaSession.controller.playbackState.state)
+            } else {
+                Log.w("MusicService", "Cannot skip previous, media item not seekable or not playing.")
+                // Opcjonalnie: przejdź do poprzedniego utworu, jeśli przewijanie nie jest możliwe
+                // super.onSkipToPrevious()
+            }
         }
     }
 }
