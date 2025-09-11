@@ -157,10 +157,6 @@ class PlayerActivity : AppCompatActivity() {
             error(R.drawable.ic_error_album)
             transformations(RoundedCornersTransformation(16f))
         }
-
-        val duration = intent.getLongExtra("DURATION", 0)
-        totalDuration = duration
-        totalTimeTextView.text = formatTime(totalDuration)
     }
 
     private fun fetchAlbumDetails(album: Album) {
