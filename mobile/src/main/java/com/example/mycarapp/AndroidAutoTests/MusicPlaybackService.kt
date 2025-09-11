@@ -516,7 +516,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 return
             }
 
-            if (exoPlayer.isCurrentMediaItemSeekable && duration > 0) {
+            if (exoPlayer.isCurrentMediaItemSeekable) {
                 var newPosition = exoPlayer.currentPosition + SEEK_INTERVAL_MS
                 if (newPosition > duration) {
                     newPosition = duration - 1000 // Zostaw 1 sekundę marginesu
