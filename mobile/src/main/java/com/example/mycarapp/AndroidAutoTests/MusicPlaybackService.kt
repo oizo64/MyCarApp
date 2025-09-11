@@ -8,7 +8,6 @@ import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.support.v4.media.MediaBrowserCompat.MediaItem as BrowserMediaItem
 import android.support.v4.media.MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
@@ -22,13 +21,14 @@ import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.utils.StreamUrlGenerator
 import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import android.support.v4.media.MediaBrowserCompat.MediaItem as BrowserMediaItem
+import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
 
 @AndroidEntryPoint
 class MusicPlaybackService : MediaBrowserServiceCompat() {
@@ -37,7 +37,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     lateinit var configManager: ConfigManager
 
     private lateinit var mediaSession: MediaSessionCompat
-    private lateinit var exoPlayer: Player
+    private lateinit var exoPlayer: ExoPlayer
     private lateinit var audioManager: AudioManager
     private lateinit var sessionCallback: MediaSessionCallback
     private val mediaItems = mutableListOf<BrowserMediaItem>()
@@ -65,14 +65,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     exoPlayer.play()
                 }
             }
+
             AudioManager.AUDIOFOCUS_LOSS -> {
                 sessionCallback.onPause()
             }
+
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 if (exoPlayer.isPlaying) {
                     sessionCallback.onPause()
                 }
             }
+
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 // Można obsłużyć ducking
             }
@@ -85,11 +88,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             try {
                 if ((exoPlayer.isPlaying || exoPlayer.playbackState == Player.STATE_READY) &&
                     exoPlayer.playbackState != Player.STATE_IDLE &&
-                    exoPlayer.playbackState != Player.STATE_ENDED) {
+                    exoPlayer.playbackState != Player.STATE_ENDED
+                ) {
 
                     val currentPosition = exoPlayer.currentPosition
-                    val duration = if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
-                        exoPlayer.duration else 0L
+                    val duration =
+                        if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
+                            exoPlayer.duration else 0L
 
                     // Aktualizuj stan z aktualną pozycją i czasem trwania
                     val playbackState = PlaybackStateCompat.Builder()
@@ -98,9 +103,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                             currentPosition,
                             1.0f
                         )
-                        .setActions(getAvailableActions(
-                            if (exoPlayer.isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
-                        ))
+                        .setActions(
+                            getAvailableActions(
+                                if (exoPlayer.isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+                            )
+                        )
                         .setBufferedPosition(exoPlayer.bufferedPosition)
                         .setExtras(Bundle().apply {
                             putLong("current_position", currentPosition)
@@ -152,15 +159,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
                 // Aktualizuj czas trwania gdy player jest ready
                 if (exoPlayer.playbackState == Player.STATE_READY) {
-                    val duration = if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
-                        exoPlayer.duration else 0L
+                    val duration =
+                        if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
+                            exoPlayer.duration else 0L
 
                     // Aktualizuj tylko jeśli czas trwania się zmienił
                     if (duration != lastDuration) {
                         lastDuration = duration
                         // Znajdź aktualny media item i zaktualizuj metadane
                         val currentMediaId = exoPlayer.currentMediaItem?.mediaId
-                        val mediaBrowserItem = currentMediaId?.let { id -> mediaItems.find { it.mediaId == id } }
+                        val mediaBrowserItem =
+                            currentMediaId?.let { id -> mediaItems.find { it.mediaId == id } }
                         mediaBrowserItem?.description?.let {
                             updateMediaMetadataWithDuration(it, duration)
                         }
@@ -267,7 +276,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private fun setPlaybackState(@PlaybackStateCompat.State state: Int) {
         val currentPosition = exoPlayer.currentPosition
-        val duration = if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE) exoPlayer.duration else 0L
+        val duration =
+            if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE) exoPlayer.duration else 0L
         val isStream = exoPlayer.duration <= 0
 
         val actions = getAvailableActions(state)
@@ -285,11 +295,19 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         })
 
         if (state == PlaybackStateCompat.STATE_ERROR) {
-            playbackStateBuilder.setErrorMessage(PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR, "Wystąpił błąd odtwarzania")
+            playbackStateBuilder.setErrorMessage(
+                PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR,
+                "Wystąpił błąd odtwarzania"
+            )
         }
 
         mediaSession.setPlaybackState(playbackStateBuilder.build())
-        Log.d("MusicService", "Playback state set to: $state at position ${formatTime(currentPosition)}/${formatTime(duration)}")
+        Log.d(
+            "MusicService",
+            "Playback state set to: $state at position ${formatTime(currentPosition)}/${
+                formatTime(duration)
+            }"
+        )
     }
 
     private fun getAvailableActions(@PlaybackStateCompat.State state: Int): Long {
@@ -312,6 +330,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             PlaybackStateCompat.STATE_PAUSED,
             PlaybackStateCompat.STATE_STOPPED,
             PlaybackStateCompat.STATE_NONE -> actions or PlaybackStateCompat.ACTION_PLAY
+
             else -> actions
         }
         return actions
@@ -337,11 +356,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             exoPlayer.prepare()
 
             // Ustaw początkowe metadane
-            val initialDuration = if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
-                exoPlayer.duration else 0L
+            val initialDuration =
+                if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
+                    exoPlayer.duration else 0L
             updateMediaMetadataWithDuration(mediaBrowserItem.description, initialDuration)
 
-            Log.d("MusicService", "Player prepared for mediaId: $mediaId, playWhenReady: $playWhenReady, initial duration: ${formatTime(initialDuration)}")
+            Log.d(
+                "MusicService",
+                "Player prepared for mediaId: $mediaId, playWhenReady: $playWhenReady, initial duration: ${
+                    formatTime(initialDuration)
+                }"
+            )
         } else {
             Log.w("MusicService", "Could not find media item for mediaId: $mediaId")
             setPlaybackState(PlaybackStateCompat.STATE_ERROR)
@@ -350,13 +375,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private fun prepareLastPlayedOrDefault(playWhenReady: Boolean) {
         val lastMediaId = sharedPreferences.getString(KEY_LAST_MEDIA_ID, null)
-        val mediaIdToPrepare = if (lastMediaId != null && mediaItems.any { it.mediaId == lastMediaId }) {
-            lastMediaId
-        } else if (mediaItems.isNotEmpty()) {
-            mediaItems.first().mediaId
-        } else {
-            null
-        }
+        val mediaIdToPrepare =
+            if (lastMediaId != null && mediaItems.any { it.mediaId == lastMediaId }) {
+                lastMediaId
+            } else if (mediaItems.isNotEmpty()) {
+                mediaItems.first().mediaId
+            } else {
+                null
+            }
 
         if (mediaIdToPrepare != null) {
             preparePlayer(mediaIdToPrepare, playWhenReady)
@@ -366,7 +392,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    private fun updateMediaMetadataWithDuration(description: MediaDescriptionCompat?, duration: Long) {
+    private fun updateMediaMetadataWithDuration(
+        description: MediaDescriptionCompat?,
+        duration: Long
+    ) {
         description?.let { desc ->
             val metadataBuilder = MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, desc.mediaId)
@@ -377,8 +406,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
 
             desc.iconUri?.let { iconUri ->
-                metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, iconUri.toString())
-                metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, iconUri.toString())
+                metadataBuilder.putString(
+                    MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI,
+                    iconUri.toString()
+                )
+                metadataBuilder.putString(
+                    MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI,
+                    iconUri.toString()
+                )
             }
 
             mediaSession.setMetadata(metadataBuilder.build())
@@ -414,7 +449,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         exoPlayer.seekTo(pos)
 
         // Natychmiastowa aktualizacja stanu z nową pozycją
-        val currentState = if (wasPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+        val currentState =
+            if (wasPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
         setPlaybackState(currentState)
 
         // Wznów odtwarzanie jeśli było włączone
@@ -430,10 +466,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         override fun onPlay() {
             Log.d("MusicService", "onPlay called")
             if (exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED || exoPlayer.currentMediaItem == null) {
-                Log.d("MusicService", "Player not ready or no media item, preparing last played or default.")
+                Log.d(
+                    "MusicService",
+                    "Player not ready or no media item, preparing last played or default."
+                )
                 prepareLastPlayedOrDefault(playWhenReady = true)
             } else if (exoPlayer.playbackState == Player.STATE_READY) {
-                val result = audioFocusRequest?.let { audioManager.requestAudioFocus(it) } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
+                val result = audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
+                    ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
                 if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                     exoPlayer.play()
                     mediaSession.isActive = true
@@ -465,7 +505,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             Log.d("MusicService", "Saved last mediaId: $mediaId")
 
             preparePlayer(mediaId, playWhenReady = true)
-            val result = audioFocusRequest?.let { audioManager.requestAudioFocus(it) } ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
+            val result = audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
+                ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                 mediaSession.isActive = true
             } else {
@@ -501,7 +542,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
 
         override fun onSkipToNext() {
-            val duration = if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE) exoPlayer.duration else 0L
+            val duration =
+                if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE) exoPlayer.duration else 0L
             val isStream = duration <= 0
 
             if (isStream) {
@@ -509,7 +551,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 return
             }
 
-            Log.d("MusicService", "onSkipToNext (seek forward) called, duration: ${formatTime(duration)}")
+            Log.d(
+                "MusicService",
+                "onSkipToNext (seek forward) called, duration: ${formatTime(duration)}"
+            )
 
             if (exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED) {
                 prepareLastPlayedOrDefault(playWhenReady = true)
@@ -522,14 +567,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     newPosition = duration - 1000 // Zostaw 1 sekundę marginesu
                 }
                 performSeek(newPosition)
-                Log.d("MusicService", "Skipped to: ${formatTime(newPosition)}/${formatTime(duration)}")
+                Log.d(
+                    "MusicService",
+                    "Skipped to: ${formatTime(newPosition)}/${formatTime(duration)}"
+                )
             } else {
                 Log.w("MusicService", "Cannot skip next, media item not seekable or no duration")
             }
         }
 
         override fun onSkipToPrevious() {
-            val duration = if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE) exoPlayer.duration else 0L
+            val duration =
+                if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE) exoPlayer.duration else 0L
             val isStream = duration <= 0
 
             if (isStream) {
@@ -537,7 +586,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 return
             }
 
-            Log.d("MusicService", "onSkipToPrevious (seek backward) called, duration: ${formatTime(duration)}")
+            Log.d(
+                "MusicService",
+                "onSkipToPrevious (seek backward) called, duration: ${formatTime(duration)}"
+            )
 
             if (exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED) {
                 prepareLastPlayedOrDefault(playWhenReady = true)
@@ -550,9 +602,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     newPosition = 0
                 }
                 performSeek(newPosition)
-                Log.d("MusicService", "Skipped to: ${formatTime(newPosition)}/${formatTime(duration)}")
+                Log.d(
+                    "MusicService",
+                    "Skipped to: ${formatTime(newPosition)}/${formatTime(duration)}"
+                )
             } else {
-                Log.w("MusicService", "Cannot skip previous, media item not seekable or no duration")
+                Log.w(
+                    "MusicService",
+                    "Cannot skip previous, media item not seekable or no duration"
+                )
             }
         }
     }
