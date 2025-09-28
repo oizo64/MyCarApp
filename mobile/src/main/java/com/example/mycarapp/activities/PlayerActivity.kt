@@ -1,10 +1,8 @@
 package com.example.mycarapp.activities
 
-import android.media.MediaPlayer
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -22,7 +20,12 @@ import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.R
 import com.example.mycarapp.dto.Album
+import com.example.mycarapp.services.PlayerService
 import com.example.mycarapp.utils.StreamUrlGenerator
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.PlaybackException
+import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -39,6 +42,10 @@ class PlayerActivity : AppCompatActivity() {
 
     @Inject
     lateinit var configManager: ConfigManager
+
+    @Inject
+    lateinit var streamUrlGenerator: StreamUrlGenerator
+
     private lateinit var playPauseButton: ImageButton
     private lateinit var seekBar: SeekBar
     private lateinit var currentTimeTextView: TextView
@@ -50,28 +57,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var appConfig: AppConfig
     private var isPlayingSong = AtomicBoolean(false)
-    private val handler = Handler(Looper.getMainLooper())
-    private var mediaPlayer: MediaPlayer? = null
-    private var totalDuration: Long = 0
+    private var exoPlayer: ExoPlayer? = null
     private var streamUrl: String? = null
     private val SKIP_TIME_MS = 60000
-
-    @Inject
-    lateinit var streamUrlGenerator: StreamUrlGenerator // Hilt dostarczy zainicjalizowany generator
-
-    private val updateSeekBarRunnable = object : Runnable {
-        override fun run() {
-            mediaPlayer?.let { player ->
-                val currentPosition = player.currentPosition
-                seekBar.progress = currentPosition
-                currentTimeTextView.text = formatTime(currentPosition.toLong())
-            }
-
-            if (isPlayingSong.get()) {
-                handler.postDelayed(this, 1000)
-            }
-        }
-    }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,6 +67,7 @@ class PlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_player)
 
         setupUI()
+        initializeExoPlayer()
 
         appConfig = configManager.getConfig()
         val album = intent.getParcelableExtra("ALBUM_DATA", Album::class.java)
@@ -92,6 +81,9 @@ class PlayerActivity : AppCompatActivity() {
 
         updateUIWithAlbumData(album)
         fetchAlbumDetails(album)
+
+        // Uruchom serwis do odtwarzania w tle
+        startPlayerService(album)
     }
 
     private fun setupUI() {
@@ -126,24 +118,73 @@ class PlayerActivity : AppCompatActivity() {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     currentTimeTextView.text = formatTime(progress.toLong())
+                    exoPlayer?.seekTo(progress.toLong())
                 }
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                handler.removeCallbacks(updateSeekBarRunnable)
+                // Pause updates during seeking
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                seekBar?.let { bar ->
-                    mediaPlayer?.seekTo(bar.progress)
-                    if (isPlayingSong.get()) {
-                        handler.post(updateSeekBarRunnable)
-                    }
-                }
+                // Resume updates after seeking
             }
         })
 
         playPauseButton.isEnabled = false
+    }
+
+    private fun initializeExoPlayer() {
+        exoPlayer = ExoPlayer.Builder(this).build().apply {
+            addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    when (state) {
+                        Player.STATE_READY -> {
+                            runOnUiThread {
+                                playPauseButton.setImageResource(R.drawable.ic_pause)
+                                isPlayingSong.set(true)
+                                seekBar.max = duration.toInt()
+                                totalTimeTextView.text = formatTime(duration)
+                                updateProgress()
+                            }
+                        }
+                        Player.STATE_ENDED -> {
+                            runOnUiThread {
+                                playPauseButton.setImageResource(R.drawable.ic_play_arrow)
+                                isPlayingSong.set(false)
+                            }
+                        }
+                        Player.STATE_BUFFERING -> {
+                            // Buffering state
+                        }
+                        Player.STATE_IDLE -> {
+                            // Idle state
+                        }
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    Log.e("PlayerActivity", "ExoPlayer error: ${error.message}", error)
+                    runOnUiThread {
+                        Toast.makeText(this@PlayerActivity, "Błąd odtwarzania: ${error.message}", Toast.LENGTH_SHORT).show()
+                        playPauseButton.setImageResource(R.drawable.ic_play_arrow)
+                        isPlayingSong.set(false)
+                    }
+                }
+            })
+        }
+    }
+
+    private fun updateProgress() {
+        exoPlayer?.let { player ->
+            if (player.isPlaying) {
+                val currentPosition = player.currentPosition
+                seekBar.progress = currentPosition.toInt()
+                currentTimeTextView.text = formatTime(currentPosition)
+                // Update every second
+                playPauseButton.postDelayed({ updateProgress() }, 1000)
+            }
+        }
     }
 
     private fun updateUIWithAlbumData(album: Album) {
@@ -175,97 +216,80 @@ class PlayerActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                streamUrl =
-                    streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id);
+                streamUrl = streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id)
+                Log.d("PlayerActivity", "Generated stream URL: $streamUrl")
 
                 runOnUiThread {
                     playPauseButton.isEnabled = true
                 }
             } catch (e: Exception) {
-                Log.e(
-                    "PlayerScreen",
-                    "Błąd podczas pobierania szczegółów piosenki: ${e.message}",
-                    e
-                )
-                Toast.makeText(this@PlayerActivity, "Błąd sieci: ${e.message}", Toast.LENGTH_SHORT)
-                    .show()
+                Log.e("PlayerActivity", "Błąd podczas pobierania URL strumienia: ${e.message}", e)
+                runOnUiThread {
+                    Toast.makeText(this@PlayerActivity, "Błąd pobierania strumienia: ${e.message}", Toast.LENGTH_SHORT).show()
+                    playPauseButton.isEnabled = false
+                }
             }
         }
     }
-
 
     private fun togglePlayback() {
         if (isPlayingSong.get()) {
             pausePlayback()
         } else {
-            streamUrl?.let { startPlayback(it) } ?: run {
+            if (streamUrl == null) {
                 Log.e("PlayerActivity", "Stream URL nie jest jeszcze dostępny")
-                Toast.makeText(this, "Poczekaj, aż piosenka się załaduje.", Toast.LENGTH_SHORT)
-                    .show()
+                Toast.makeText(this, "Poczekaj, aż piosenka się załaduje.", Toast.LENGTH_SHORT).show()
+                return
             }
+
+            startPlayback()
         }
     }
 
-    private fun startPlayback(url: String) {
+    private fun startPlayback() {
         try {
-            if (mediaPlayer == null) {
-                initializeMediaPlayer(url)
-            } else {
-                mediaPlayer?.start()
-                isPlayingSong.set(true)
-                playPauseButton.setImageResource(R.drawable.ic_pause)
-                handler.post(updateSeekBarRunnable)
+            streamUrl?.let { url ->
+                Log.d("PlayerActivity", "Starting playback with URL: ${url.take(100)}...")
+
+                val mediaItem = MediaItem.fromUri(url)
+                exoPlayer?.setMediaItem(mediaItem)
+                exoPlayer?.prepare()
+                exoPlayer?.play()
             }
         } catch (e: Exception) {
             Log.e("PlayerActivity", "Błąd podczas rozpoczynania odtwarzania", e)
-            Toast.makeText(this, "Błąd odtwarzania.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun initializeMediaPlayer(url: String) {
-        mediaPlayer = MediaPlayer().apply {
-            setDataSource(url)
-            setOnPreparedListener { player ->
-                player.start()
-                isPlayingSong.set(true)
-                playPauseButton.setImageResource(R.drawable.ic_pause)
-                seekBar.max = player.duration
-                totalDuration = player.duration.toLong()
-                totalTimeTextView.text = formatTime(totalDuration)
-                handler.post(updateSeekBarRunnable)
+            runOnUiThread {
+                Toast.makeText(this, "Błąd odtwarzania: ${e.message}", Toast.LENGTH_SHORT).show()
+                playPauseButton.setImageResource(R.drawable.ic_play_arrow)
+                isPlayingSong.set(false)
             }
-            setOnErrorListener { _, what, extra ->
-                Log.e("PlayerActivity", "Błąd MediaPlayer: what=$what, extra=$extra")
-                Toast.makeText(this@PlayerActivity, "Błąd odtwarzania.", Toast.LENGTH_SHORT).show()
-                false
-            }
-            prepareAsync()
         }
     }
 
     private fun pausePlayback() {
-        mediaPlayer?.pause()
+        exoPlayer?.pause()
         isPlayingSong.set(false)
-        playPauseButton.setImageResource(R.drawable.ic_play_arrow)
-        handler.removeCallbacks(updateSeekBarRunnable)
+        runOnUiThread {
+            playPauseButton.setImageResource(R.drawable.ic_play_arrow)
+        }
     }
 
     private fun skipBackward() {
-        mediaPlayer?.let { player ->
+        exoPlayer?.let { player ->
             val newPosition = max(0, player.currentPosition - SKIP_TIME_MS)
             player.seekTo(newPosition)
-            seekBar.progress = newPosition
-            currentTimeTextView.text = formatTime(newPosition.toLong())
+            seekBar.progress = newPosition.toInt()
+            currentTimeTextView.text = formatTime(newPosition)
             showSkipFeedback("-1:00")
         }
     }
 
     private fun skipForward() {
-        mediaPlayer?.let { player ->
+        exoPlayer?.let { player ->
             val newPosition = min(player.duration, player.currentPosition + SKIP_TIME_MS)
             player.seekTo(newPosition)
-            seekBar.progress = newPosition
-            currentTimeTextView.text = formatTime(newPosition.toLong())
+            seekBar.progress = newPosition.toInt()
+            currentTimeTextView.text = formatTime(newPosition)
             showSkipFeedback("+1:00")
         }
     }
@@ -300,10 +324,23 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun startPlayerService(album: Album) {
+        val serviceIntent = Intent(this, PlayerService::class.java).apply {
+            putExtra("ALBUM_DATA", album)
+            putExtra("STREAM_URL", streamUrl)
+        }
+        startService(serviceIntent)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacks(updateSeekBarRunnable)
-        mediaPlayer?.release()
-        mediaPlayer = null
+        exoPlayer?.release()
+        exoPlayer = null
     }
+
+    // USUNIĘTE: onPause() nie pauzuje już odtwarzania
+    // override fun onPause() {
+    //     super.onPause()
+    //     pausePlayback()
+    // }
 }

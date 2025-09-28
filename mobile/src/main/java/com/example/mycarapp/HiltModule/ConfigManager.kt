@@ -14,5 +14,6 @@ interface ConfigManager {
     suspend fun deleteAccount(accountId: Int)
     suspend fun setAsDefaultAccount(accountId: Int)
     suspend fun getDefaultAccount(): Account?
+
     fun clearConfig()
 }

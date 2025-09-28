@@ -9,7 +9,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
-import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.activities.AlbumsActivity
 import com.example.mycarapp.controller.ApiService
@@ -61,9 +60,6 @@ class MainActivity : AppCompatActivity() {
         statusTextView = findViewById(R.id.status_text_view)
 
         // Ustawienie domyślnych wartości testowych
-        serverUrlEditText.setText(getString(R.string.server_address))
-        usernameEditText.setText(getString(R.string.login))
-        passwordEditText.setText(getString(R.string.password))
         statusTextView.text = getString(R.string.status_initial_text)
     }
 
@@ -140,7 +136,11 @@ class MainActivity : AppCompatActivity() {
         return retrofit.create(ApiService::class.java)
     }
 
-    private fun handleSuccessfulLogin(loginResult: LoginResponse, serverUrl: String, username: String) {
+    private fun handleSuccessfulLogin(
+        loginResult: LoginResponse,
+        serverUrl: String,
+        username: String
+    ) {
         // Pobierz instancję AppConfig z Hilt (to jest singleton)
         val appConfig = configManager.getConfig()
 

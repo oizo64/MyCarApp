@@ -47,6 +47,7 @@
             android:name=".activities.AccountsManagementActivity"
             android:exported="false" />
 
+
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
             android:value="1" /> <!-- Meta-dane dla Android Auto -->
@@ -74,6 +75,10 @@
                 android:name="com.google.android.gms.car.media.MediaBrowserService"
                 android:value="true" />
         </service>
+        <service
+            android:name=".services.PlayerService"
+            android:enabled="true"
+            android:exported="false" />
 
         <receiver
             android:name="androidx.media.session.MediaButtonReceiver"

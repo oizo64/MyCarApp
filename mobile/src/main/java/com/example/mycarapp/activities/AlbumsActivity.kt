@@ -50,6 +50,9 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     private lateinit var statusTextView: TextView
     private lateinit var fabAddAccount: FloatingActionButton
     private lateinit var appConfig: AppConfig
+    private var isMediaPlayerPrepared = false
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,14 +61,8 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
         setupUI()
         appConfig = configManager.getConfig()
 
-        // ZMIEŃ TĘ LOGIKĘ - najpierw sprawdź czy użytkownik jest zalogowany
-        if (isUserLoggedIn()) {
-            initializeRepository()
-            loadAlbums()
-        } else {
-            // Tylko jeśli nie ma zalogowanego użytkownika, spróbuj automatyczne logowanie
-            autoLoginWithStoredCredentials()
-        }
+        // Najpierw spróbuj auto-login, potem sprawdź stan
+        autoLoginWithStoredCredentials()
     }
 
     private fun setupUI() {
@@ -139,20 +136,58 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
         }
     }
     private fun useAccount(account: Account) {
-        // Zaktualizuj konfigurację z konta
-        appConfig.authToken = account.authToken
-        appConfig.subsonicSalt = account.subsonicSalt
-        appConfig.subsonicToken = account.subsonicToken
-        appConfig.serverUrl = account.serverUrl
-        appConfig.username = account.username
+        lifecycleScope.launch(Dispatchers.IO) {
+            runOnUiThread {
+                showLoadingState()
+                statusTextView.text = getString(R.string.status_connecting)
+            }
 
-        // Zapisz konfigurację
-        configManager.updateConfig(appConfig)
+            try {
+                // Najpierw zaloguj się ponownie, aby odświeżyć tokeny
+                val apiService = createApiService(account.serverUrl)
+                val loginRequest = LoginRequest(username = account.username, password = account.password)
+                val response = apiService.login(loginRequest)
 
-        runOnUiThread {
-            statusTextView.text = getString(R.string.status_login_success)
-            initializeRepository()
-            loadAlbums()
+                if (response.isSuccessful && response.body() != null) {
+                    val loginResult = response.body()!!
+
+                    // Zaktualizuj konto z nowymi tokenami
+                    val updatedAccount = account.copy(
+                        authToken = loginResult.token,
+                        subsonicSalt = loginResult.subsonicSalt,
+                        subsonicToken = loginResult.subsonicToken
+                    )
+
+                    // Zapisz zaktualizowane konto w bazie
+                    configManager.updateAccount(updatedAccount)
+
+                    // Zaktualizuj konfigurację z nowymi danymi
+                    appConfig.authToken = loginResult.token
+                    appConfig.subsonicSalt = loginResult.subsonicSalt
+                    appConfig.subsonicToken = loginResult.subsonicToken
+                    appConfig.serverUrl = account.serverUrl
+                    appConfig.username = account.username
+
+                    // Zapisz konfigurację
+                    configManager.updateConfig(appConfig)
+
+                    runOnUiThread {
+                        statusTextView.text = getString(R.string.status_login_success)
+                        initializeRepository()
+                        loadAlbums()
+                    }
+                } else {
+                    runOnUiThread {
+                        statusTextView.text = getString(R.string.status_login_error)
+                        Log.e("AlbumsActivity", "Login failed: ${response.message()}")
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    statusTextView.text = getString(R.string.status_network_error)
+                    Log.e("AlbumsActivity", "Network error during login", e)
+                }
+            }
         }
     }
 
@@ -218,6 +253,10 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     }
 
     private fun initializeRepository() {
+        Log.d("AlbumsActivity", "Initializing repository with:")
+        Log.d("AlbumsActivity", "Server: ${appConfig.serverUrl}")
+        Log.d("AlbumsActivity", "Username: ${appConfig.username}")
+
         albumsRepository = RemoteAlbumsRepository(
             authToken = appConfig.authToken!!,
             subsonicSalt = appConfig.subsonicSalt ?: "",
@@ -228,16 +267,25 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     }
 
     private fun loadAlbums() {
+        if (!isUserLoggedIn()) {
+            showErrorState("Not logged in")
+            return
+        }
+
+        if (!::albumsRepository.isInitialized) {
+            initializeRepository()
+        }
+
         lifecycleScope.launch {
             showLoadingState()
             try {
                 val unsortedAlbumsList = albumsRepository.getAlbums()
+                Log.d("AlbumsActivity", "Loaded ${unsortedAlbumsList.size} albums")
                 val sortedAlbumsList = sortAlbumsByDate(unsortedAlbumsList)
-                appConfig.sortedAlbums = sortedAlbumsList
                 updateUIWithAlbums(sortedAlbumsList)
             } catch (e: Exception) {
-                showErrorState(e.message)
-                Log.e("ALBUMS_LOAD", "Błąd ładowania albumów", e)
+                Log.e("AlbumsActivity", "Error loading albums", e)
+                showErrorState("Error: ${e.message}")
             } finally {
                 hideLoadingState()
             }
@@ -298,4 +346,5 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
         }
         startActivity(intent)
     }
+
 }

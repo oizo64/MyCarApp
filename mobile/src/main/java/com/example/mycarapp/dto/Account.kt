@@ -14,6 +14,6 @@ data class Account(
     val subsonicSalt: String? = null,
     val subsonicToken: String? = null,
     val isActive: Boolean = false,
-    val isDefault: Boolean = false, // DODAJ TE LINIĘ
+    val isDefault: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
