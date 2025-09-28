@@ -283,10 +283,6 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
                 val unsortedAlbumsList = albumsRepository.getAlbums()
                 Log.d("AlbumsActivity", "Loaded ${unsortedAlbumsList.size} albums")
                 val sortedAlbumsList = sortAlbumsByDate(unsortedAlbumsList)
-
-                // ZAPISZ ALBUMY DO CONFIG MANAGERA
-                configManager.setSortedAlbums(sortedAlbumsList)
-
                 updateUIWithAlbums(sortedAlbumsList)
             } catch (e: Exception) {
                 Log.e("AlbumsActivity", "Error loading albums", e)

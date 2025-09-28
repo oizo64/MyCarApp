@@ -19,6 +19,7 @@ import androidx.core.net.toUri
 import androidx.media.MediaBrowserServiceCompat
 import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
+import com.example.mycarapp.utils.DateFormatter
 import com.example.mycarapp.utils.StreamUrlGenerator
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.PlaybackException
@@ -232,13 +233,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 val streamUrlForAlbum = runBlocking {
                     streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id)
                 }
-
+                val formattedDate = DateFormatter.formatAlbumDate(album.createdAt)
                 val description = MediaDescriptionCompat.Builder()
                     .setMediaId(album.id)
                     .setTitle(album.name)
-                    .setSubtitle(album.albumArtist) // Dodaj artystę jako subtitle
+                    .setSubtitle("${album.albumArtist} • $formattedDate")
                     .setMediaUri(streamUrlForAlbum?.toUri())
-                    .setIconUri(album.coverArtUrl?.toUri())
+                    // NIE USTAWIAJ ICON URI/BITMAP TUTAJ
                     .build()
 
                 mediaItems.add(BrowserMediaItem(description, FLAG_PLAYABLE))
@@ -249,6 +250,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .setMediaId("default_item")
                 .setTitle("Brak albumów")
                 .setSubtitle("Lista jest pusta")
+                .setDescription("Brak danych")
                 .setMediaUri(STREAM_URL.toUri())
                 .setIconUri("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri())
                 .build()

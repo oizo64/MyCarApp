@@ -18,6 +18,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import androidx.core.graphics.toColorInt
+import com.example.mycarapp.utils.DateFormatter
 
 // Definiujemy interfejs, który będzie nasłuchiwał na kliknięcia
 interface OnItemClickListener {
@@ -76,19 +77,8 @@ class AlbumsAdapter(
         return albums.size
     }
 
-    private fun formatDate(dateString: String?): String {
-        return try {
-            if (dateString.isNullOrEmpty()) {
-                return "Brak daty"
-            }
-            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'", Locale.getDefault())
-            val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val date: Date? = parser.parse(dateString)
-            date?.let { formatter.format(it) } ?: "Brak daty"
-        } catch (e: Exception) {
-            Log.e("DATE_FORMAT", "Błąd parsowania daty: $dateString", e)
-            "Błędna data"
-        }
+    fun formatDate(dateString: String?): String {
+        return DateFormatter.formatAlbumDate(dateString)
     }
 
     private fun isWithinLastSevenDays(dateString: String?): Boolean {
