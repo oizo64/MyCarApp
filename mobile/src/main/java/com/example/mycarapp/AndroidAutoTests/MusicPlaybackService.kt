@@ -223,26 +223,28 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private fun createMediaItems() {
-        val sortedAlbums = appConfig.sortedAlbums
+        // ODCZYTAJ ALBUMY Z CONFIG MANAGERA zamiast z appConfig.sortedAlbums
+        val sortedAlbums = configManager.getSortedAlbums()
         mediaItems.clear()
 
-        sortedAlbums.forEach { album ->
-            val streamUrlForAlbum =
-                runBlocking {
+        if (sortedAlbums.isNotEmpty()) {
+            sortedAlbums.forEach { album ->
+                val streamUrlForAlbum = runBlocking {
                     streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id)
                 }
 
-            val description = MediaDescriptionCompat.Builder()
-                .setMediaId(album.id)
-                .setTitle(album.name)
-                .setMediaUri(streamUrlForAlbum?.toUri())
-                .setIconUri(album.coverArtUrl?.toUri())
-                .build()
+                val description = MediaDescriptionCompat.Builder()
+                    .setMediaId(album.id)
+                    .setTitle(album.name)
+                    .setSubtitle(album.albumArtist) // Dodaj artystę jako subtitle
+                    .setMediaUri(streamUrlForAlbum?.toUri())
+                    .setIconUri(album.coverArtUrl?.toUri())
+                    .build()
 
-            mediaItems.add(BrowserMediaItem(description, FLAG_PLAYABLE))
-        }
-
-        if (mediaItems.isEmpty()) {
+                mediaItems.add(BrowserMediaItem(description, FLAG_PLAYABLE))
+            }
+        } else {
+            // Fallback jeśli brak albumów
             val defaultDescription = MediaDescriptionCompat.Builder()
                 .setMediaId("default_item")
                 .setTitle("Brak albumów")
@@ -251,7 +253,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .setIconUri("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri())
                 .build()
             mediaItems.add(BrowserMediaItem(defaultDescription, FLAG_PLAYABLE))
+
+            Log.w("MusicService", "No albums found in ConfigManager")
         }
+
+        Log.d("MusicService", "Created ${mediaItems.size} media items from ConfigManager")
     }
 
     override fun onLoadChildren(

@@ -34,6 +34,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -282,6 +283,10 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
                 val unsortedAlbumsList = albumsRepository.getAlbums()
                 Log.d("AlbumsActivity", "Loaded ${unsortedAlbumsList.size} albums")
                 val sortedAlbumsList = sortAlbumsByDate(unsortedAlbumsList)
+
+                // ZAPISZ ALBUMY DO CONFIG MANAGERA
+                configManager.setSortedAlbums(sortedAlbumsList)
+
                 updateUIWithAlbums(sortedAlbumsList)
             } catch (e: Exception) {
                 Log.e("AlbumsActivity", "Error loading albums", e)
@@ -326,18 +331,14 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     }
 
     private fun sortAlbumsByDate(albums: List<Album>): List<Album> {
-        return albums.sortedByDescending { album ->
+        return albums.sortedWith(compareByDescending<Album> { album ->
             try {
-                val parser = SimpleDateFormat(
-                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'",
-                    Locale.getDefault()
-                )
-                parser.parse(album.createdAt)
+                Instant.parse(album.createdAt).toEpochMilli()
             } catch (e: Exception) {
                 Log.e("SORT_DATE", "Błąd parsowania daty: ${album.createdAt}", e)
-                Date(0)
+                0L
             }
-        }
+        })
     }
 
     override fun onItemClick(album: Album) {

@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import com.example.mycarapp.Repository.AccountDao
 
 import com.example.mycarapp.dto.Account
+import com.example.mycarapp.dto.Album
 import com.example.mycarapp.dto.AppDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
@@ -151,5 +152,18 @@ class ConfigManagerImpl @Inject constructor(
 
     override suspend fun getDefaultAccount(): Account? {
         return accountDao.getDefaultAccount()
+    }
+
+    override fun setSortedAlbums(albums: List<Album>) {
+        appConfig.sortedAlbums = albums
+        // Opcjonalnie: zapisz do SharedPreferences jeśli potrzebujesz trwałości
+        sharedPreferences.edit {
+            // Możesz zapisać ilość albumów dla informacji
+            putInt("sorted_albums_count", albums.size)
+        }
+    }
+
+    override fun getSortedAlbums(): List<Album> {
+        return appConfig.sortedAlbums
     }
 }

@@ -1,6 +1,7 @@
 package com.example.mycarapp.HiltModule
 
 import com.example.mycarapp.dto.Account
+import com.example.mycarapp.dto.Album
 import kotlinx.coroutines.flow.Flow
 
 interface ConfigManager {
@@ -14,6 +15,7 @@ interface ConfigManager {
     suspend fun deleteAccount(accountId: Int)
     suspend fun setAsDefaultAccount(accountId: Int)
     suspend fun getDefaultAccount(): Account?
-
+    fun setSortedAlbums(albums: List<Album>)
+    fun getSortedAlbums(): List<Album>
     fun clearConfig()
 }
