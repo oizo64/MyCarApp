@@ -1,6 +1,6 @@
 package com.example.mycarapp.adapters
 
-import android.graphics.Color
+import android.content.Context
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -8,28 +8,30 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
+import androidx.core.graphics.toColorInt
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.transform.RoundedCornersTransformation
 import com.example.mycarapp.R
 import com.example.mycarapp.dto.Album
+import com.example.mycarapp.utils.CoverManager
+import com.example.mycarapp.utils.DateFormatter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import androidx.core.graphics.toColorInt
-import com.example.mycarapp.utils.DateFormatter
 
-// Definiujemy interfejs, który będzie nasłuchiwał na kliknięcia
 interface OnItemClickListener {
     fun onItemClick(album: Album)
 }
 
-// Zmieniamy konstruktor adaptera, aby przyjmował instancję słuchacza
 class AlbumsAdapter(
     private val albums: List<Album>,
-    private val listener: OnItemClickListener // Dodajemy nowy parametr
+    private val listener: OnItemClickListener,
+    private val context: Context // Dodaj Context
 ) : RecyclerView.Adapter<AlbumsAdapter.AlbumViewHolder>() {
+
+    private val coverManager = CoverManager(context) // Inicjalizuj CoverManager
 
     class AlbumViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val cardView: CardView = itemView.findViewById(R.id.card_view)
@@ -52,7 +54,10 @@ class AlbumsAdapter(
         holder.albumArtistTextView.text = "Artysta: ${album.albumArtist}"
         holder.albumCreatedTextView.text = "Created: ${formatDate(album.createdAt)}"
 
-        holder.albumCoverImageView.load(album.coverArtUrl) {
+        // Użyj CoverManager do uzyskania lokalnego URI obrazka
+        val localCoverUri = coverManager.getLocalCoverUri(album.id, album.coverArtUrl)
+
+        holder.albumCoverImageView.load(localCoverUri) { // Ładuj z lokalnego URI
             crossfade(true)
             placeholder(R.drawable.ic_placeholder_album)
             error(R.drawable.ic_error_album)
@@ -63,11 +68,14 @@ class AlbumsAdapter(
             holder.cardView.setCardBackgroundColor("#E8F5E9".toColorInt())
         } else {
             val typedValue = android.util.TypedValue()
-            holder.itemView.context.theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)
+            holder.itemView.context.theme.resolveAttribute(
+                android.R.attr.colorBackground,
+                typedValue,
+                true
+            )
             holder.cardView.setCardBackgroundColor(typedValue.data)
         }
 
-        // Dodajemy listener do całego widoku elementu
         holder.itemView.setOnClickListener {
             listener.onItemClick(album)
         }

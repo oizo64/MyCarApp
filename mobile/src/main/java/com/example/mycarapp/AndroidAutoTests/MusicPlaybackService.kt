@@ -1,13 +1,17 @@
 package com.example.mycarapp.AndroidAutoTests
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
@@ -19,6 +23,7 @@ import androidx.core.net.toUri
 import androidx.media.MediaBrowserServiceCompat
 import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
+import com.example.mycarapp.utils.CoverManager
 import com.example.mycarapp.utils.DateFormatter
 import com.example.mycarapp.utils.StreamUrlGenerator
 import com.google.android.exoplayer2.ExoPlayer
@@ -26,10 +31,9 @@ import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import android.support.v4.media.MediaBrowserCompat.MediaItem as BrowserMediaItem
-import com.google.android.exoplayer2.MediaItem as ExoPlayerMediaItem
 
 @AndroidEntryPoint
 class MusicPlaybackService : MediaBrowserServiceCompat() {
@@ -41,7 +45,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private lateinit var exoPlayer: ExoPlayer
     private lateinit var audioManager: AudioManager
     private lateinit var sessionCallback: MediaSessionCallback
-    private val mediaItems = mutableListOf<BrowserMediaItem>()
+    private val mediaItems = mutableListOf<MediaItem>()
 
     private var audioFocusRequest: AudioFocusRequest? = null
 
@@ -51,6 +55,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     @Inject
     lateinit var streamUrlGenerator: StreamUrlGenerator
+
+    private lateinit var coverManager: CoverManager
 
     companion object {
         private const val PREFS_NAME = "MusicServicePrefs"
@@ -130,10 +136,26 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    private fun debugStorageState() {
+        val internalDir = filesDir
+        val externalDir = getExternalFilesDir(null)
+        val coverDir = getCoverStorageDir()
+
+        Log.d("MusicService", "Internal dir: ${internalDir.absolutePath}")
+        Log.d("MusicService", "External dir: ${externalDir?.absolutePath}")
+        Log.d("MusicService", "Cover dir: ${coverDir.absolutePath}")
+        Log.d("MusicService", "Cover dir exists: ${coverDir.exists()}")
+        Log.d("MusicService", "Cover dir writable: ${coverDir.canWrite()}")
+    }
+
     override fun onCreate() {
         super.onCreate()
+        debugStorageState()
         appConfig = configManager.getConfig()
         sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        coverManager = CoverManager(this) // Inicjalizuj CoverManager
+
+        coverManager.cleanupCorruptedFiles() // Użyj CoverManager zamiast bezpośredniej metody
         exoPlayer = ExoPlayer.Builder(this).build()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -224,7 +246,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private fun createMediaItems() {
-        // ODCZYTAJ ALBUMY Z CONFIG MANAGERA zamiast z appConfig.sortedAlbums
         val sortedAlbums = configManager.getSortedAlbums()
         mediaItems.clear()
 
@@ -234,37 +255,77 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     streamUrlGenerator.getFirstSongStreamUrlForAlbum(album.id)
                 }
                 val formattedDate = DateFormatter.formatAlbumDate(album.createdAt)
+
+                val mediaSessionCoverUri = coverManager.getLocalCoverUri(album.id, album.coverArtUrl)
+
+                Log.d(
+                    "MusicService",
+                    "MediaSession cover - AlbumId: ${album.id}, URI: $mediaSessionCoverUri"
+                )
+
+                // DODAJ: Przyznaj tymczasowe uprawnienia do URI
+                if (mediaSessionCoverUri.scheme == "content") {
+                    applicationContext.grantUriPermission(
+                        "com.android.systemui", // System UI package
+                        mediaSessionCoverUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+
                 val description = MediaDescriptionCompat.Builder()
                     .setMediaId(album.id)
                     .setTitle(album.name)
                     .setSubtitle("${album.albumArtist} • $formattedDate")
                     .setMediaUri(streamUrlForAlbum?.toUri())
-                    // NIE USTAWIAJ ICON URI/BITMAP TUTAJ
+                    .setIconUri(mediaSessionCoverUri)
                     .build()
 
-                mediaItems.add(BrowserMediaItem(description, FLAG_PLAYABLE))
+                mediaItems.add(MediaItem(description, FLAG_PLAYABLE))
+
+                // Pobierz obrazek w tle jeśli nie istnieje lokalnie
+                if (album.coverArtUrl != null) {
+                    val localFile = File(getCoverStorageDir(), "${album.id}.jpg")
+                    if (!localFile.exists()) {
+                        coverManager.downloadAndSaveCover(album.id, album.coverArtUrl)
+                    }
+                }
             }
         } else {
-            // Fallback jeśli brak albumów
+            // Fallback
+            val defaultCoverUri = getDefaultLocalCoverUri()
             val defaultDescription = MediaDescriptionCompat.Builder()
                 .setMediaId("default_item")
                 .setTitle("Brak albumów")
                 .setSubtitle("Lista jest pusta")
-                .setDescription("Brak danych")
                 .setMediaUri(STREAM_URL.toUri())
-                .setIconUri("https://i.pinimg.com/736x/1e/1e-fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri())
+                .setIconUri(defaultCoverUri)
                 .build()
-            mediaItems.add(BrowserMediaItem(defaultDescription, FLAG_PLAYABLE))
-
-            Log.w("MusicService", "No albums found in ConfigManager")
+            mediaItems.add(MediaItem(defaultDescription, FLAG_PLAYABLE))
         }
+    }
 
-        Log.d("MusicService", "Created ${mediaItems.size} media items from ConfigManager")
+    private fun getDefaultLocalCoverUri(): Uri {
+        val defaultFile = File(getCoverStorageDir(), "default_cover.jpg")
+        return if (defaultFile.exists()) {
+            Uri.fromFile(defaultFile)
+        } else {
+            // Fallback do zdalnego domyślnego obrazka
+            "https://i.pinimg.com/736x/1e/1e/fc/1e1efcc0e4005e2b93d321b9a69a6899.jpg".toUri()
+        }
+    }
+
+    private fun getCoverStorageDir(): File {
+        // Użyj katalogu zewnętrznego, który jest dostępny dla innych komponentów systemu
+        val dir = File(getExternalFilesDir(null), "covers")
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
     }
 
     override fun onLoadChildren(
         parentId: String,
-        result: Result<MutableList<BrowserMediaItem>>
+        result: Result<MutableList<MediaItem>>
     ) {
         if (parentId == "root_id") {
             result.sendResult(mediaItems)
@@ -355,7 +416,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 exoPlayer.clearMediaItems()
             }
 
-            val exoPlayerItem = ExoPlayerMediaItem.Builder()
+            val exoPlayerItem = com.google.android.exoplayer2.MediaItem.Builder()
                 .setUri(mediaUri)
                 .setMediaId(mediaId)
                 .build()
@@ -414,6 +475,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
 
             desc.iconUri?.let { iconUri ->
+                // DODAJ: Spróbuj załadować bitmapę bezpośrednio
+                try {
+                    val bitmap = loadBitmapFromUri(iconUri)
+                    bitmap?.let {
+                        metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
+                        metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, it)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MusicService", "Error loading bitmap from URI: $iconUri", e)
+                }
+
+                // Nadal ustaw URI jako fallback
                 metadataBuilder.putString(
                     MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI,
                     iconUri.toString()
@@ -429,6 +502,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    @SuppressLint("Recycle")
+    private fun loadBitmapFromUri(uri: Uri): android.graphics.Bitmap? {
+        return try {
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+                android.graphics.BitmapFactory.decodeStream(inputStream)
+            }
+        } catch (e: Exception) {
+            Log.e("MusicService", "Error decoding bitmap from URI: $uri", e)
+            null
+        }
+    }
     private fun updateMetadataWithDuration(duration: Long) {
         val currentMetadata = mediaSession.controller.metadata
         if (currentMetadata != null) {

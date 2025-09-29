@@ -12,19 +12,17 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.mycarapp.HiltModule.AppConfig
+import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.R
 import com.example.mycarapp.Repository.AlbumsRepository
 import com.example.mycarapp.Repository.RemoteAlbumsRepository
 import com.example.mycarapp.adapters.AlbumsAdapter
 import com.example.mycarapp.adapters.OnItemClickListener
 import com.example.mycarapp.controller.ApiService
+import com.example.mycarapp.dto.Account
 import com.example.mycarapp.dto.Album
 import com.example.mycarapp.dto.LoginRequest
-import com.example.mycarapp.dto.LoginResponse
-import com.example.mycarapp.HiltModule.AppConfig
-import com.example.mycarapp.HiltModule.ConfigManager
-import com.example.mycarapp.MainActivity
-import com.example.mycarapp.dto.Account
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -33,10 +31,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.text.SimpleDateFormat
 import java.time.Instant
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -52,7 +47,6 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     private lateinit var fabAddAccount: FloatingActionButton
     private lateinit var appConfig: AppConfig
     private var isMediaPlayerPrepared = false
-
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -136,6 +130,7 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
             }
         }
     }
+
     private fun useAccount(account: Account) {
         lifecycleScope.launch(Dispatchers.IO) {
             runOnUiThread {
@@ -146,7 +141,8 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
             try {
                 // Najpierw zaloguj się ponownie, aby odświeżyć tokeny
                 val apiService = createApiService(account.serverUrl)
-                val loginRequest = LoginRequest(username = account.username, password = account.password)
+                val loginRequest =
+                    LoginRequest(username = account.username, password = account.password)
                 val response = apiService.login(loginRequest)
 
                 if (response.isSuccessful && response.body() != null) {
@@ -209,48 +205,10 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
         return retrofit.create(ApiService::class.java)
     }
 
-    private fun handleSuccessfulLogin(loginResult: LoginResponse, serverUrl: String, username: String) {
-        // Zaktualizuj konfigurację
-        appConfig.authToken = loginResult.token
-        appConfig.subsonicSalt = loginResult.subsonicSalt
-        appConfig.subsonicToken = loginResult.subsonicToken
-        appConfig.serverUrl = serverUrl
-        appConfig.username = username
-
-        // Zapisz konfigurację
-        configManager.updateConfig(appConfig)
-
-        runOnUiThread {
-            statusTextView.text = getString(R.string.status_login_success)
-            initializeRepository()
-            loadAlbums()
-        }
-    }
-
-    private fun handleLoginError(code: Int, message: String?) {
-        Log.e("API_AUTH", "Błąd logowania: $code - $message")
-        runOnUiThread {
-            statusTextView.text = getString(R.string.status_login_error)
-        }
-    }
-
-    private fun handleNetworkError(e: Exception) {
-        Log.e("API_AUTH", "Wyjątek podczas logowania:", e)
-        runOnUiThread {
-            statusTextView.text = getString(R.string.status_network_error)
-        }
-    }
-
     private fun showManualLoginRequired() {
         runOnUiThread {
             statusTextView.text = getString(R.string.status_manual_login_required)
         }
-    }
-
-    private fun redirectToManualLogin() {
-        val intent = Intent(this@AlbumsActivity, MainActivity::class.java)
-        startActivity(intent)
-        finish()
     }
 
     private fun initializeRepository() {
@@ -310,16 +268,17 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
 
     private fun updateUIWithAlbums(albums: List<Album>) {
         if (albums.isNotEmpty()) {
-            albumsAdapter = AlbumsAdapter(albums, this@AlbumsActivity)
+            // Przekaż context do adaptera
+            albumsAdapter = AlbumsAdapter(albums, this@AlbumsActivity, this)
             albumsRecyclerView.layoutManager = LinearLayoutManager(this@AlbumsActivity)
             albumsRecyclerView.adapter = albumsAdapter
             albumsRecyclerView.visibility = View.VISIBLE
             statusTextView.visibility = View.GONE
-            fabAddAccount.visibility = View.VISIBLE // Show FAB when albums are loaded
+            fabAddAccount.visibility = View.VISIBLE
         } else {
             statusTextView.text = getString(R.string.no_data_found)
             statusTextView.visibility = View.VISIBLE
-            fabAddAccount.visibility = View.VISIBLE // Show FAB even if no albums
+            fabAddAccount.visibility = View.VISIBLE
         }
     }
 
