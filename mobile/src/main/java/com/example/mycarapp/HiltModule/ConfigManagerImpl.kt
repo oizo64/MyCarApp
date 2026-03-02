@@ -17,7 +17,7 @@ import javax.inject.Singleton
 class ConfigManagerImpl @Inject constructor(
     private val sharedPreferences: SharedPreferences,
     private val appConfig: AppConfig,
-    private val database: AppDatabase
+    database: AppDatabase
 ) : ConfigManager {
 
     private val accountDao: AccountDao = database.accountDao()

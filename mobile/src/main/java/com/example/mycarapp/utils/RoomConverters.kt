@@ -2,7 +2,6 @@ package com.example.mycarapp.utils
 
 import androidx.room.TypeConverter
 import com.example.mycarapp.dto.Genre
-import com.example.mycarapp.dto.Participant
 import com.example.mycarapp.dto.Participants
 import com.example.mycarapp.dto.Tags
 import com.google.gson.Gson
@@ -23,17 +22,6 @@ class RoomConverters {
     }
 
     @TypeConverter
-    fun fromStringList(value: List<String>?): String {
-        return gson.toJson(value)
-    }
-
-    @TypeConverter
-    fun toStringList(value: String): List<String> {
-        val listType = object : TypeToken<List<String>>() {}.type
-        return gson.fromJson(value, listType) ?: emptyList()
-    }
-
-    @TypeConverter
     fun fromTags(value: Tags?): String {
         return gson.toJson(value)
     }
@@ -50,7 +38,11 @@ class RoomConverters {
 
     @TypeConverter
     fun toParticipants(value: String): Participants {
-        return gson.fromJson(value, Participants::class.java) ?: Participants(emptyList(), emptyList(), emptyList())
+        return gson.fromJson(value, Participants::class.java) ?: Participants(
+            emptyList(),
+            emptyList(),
+            emptyList()
+        )
     }
 
     @TypeConverter

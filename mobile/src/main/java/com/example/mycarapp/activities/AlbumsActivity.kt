@@ -226,7 +226,7 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
         return albums.sortedWith(compareByDescending<Album> { album ->
             try {
                 Instant.parse(album.createdAt).toEpochMilli()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 0L
             }
         })
