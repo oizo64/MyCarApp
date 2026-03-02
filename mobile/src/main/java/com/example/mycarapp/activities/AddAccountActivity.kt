@@ -10,17 +10,13 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.mycarapp.R
-import com.example.mycarapp.controller.ApiService
+import com.example.mycarapp.controller.ApiServiceFactory
 import com.example.mycarapp.dto.Account
 import com.example.mycarapp.dto.LoginRequest
 import com.example.mycarapp.HiltModule.ConfigManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -28,6 +24,9 @@ class AddAccountActivity : AppCompatActivity() {
 
     @Inject
     lateinit var configManager: ConfigManager
+
+    @Inject
+    lateinit var apiServiceFactory: ApiServiceFactory
 
     private lateinit var serverUrlEditText: EditText
     private lateinit var usernameEditText: EditText
@@ -73,15 +72,13 @@ class AddAccountActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // Najpierw spróbuj zalogować się do serwera
-                val apiService = createApiService(serverUrl)
+                val apiService = apiServiceFactory.createPublicApiService(serverUrl)
                 val loginRequest = LoginRequest(username = username, password = password)
                 val response = apiService.login(loginRequest)
 
                 if (response.isSuccessful && response.body() != null) {
                     val loginResult = response.body()!!
 
-                    // Utwórz nowe konto z danymi logowania
                     val account = Account(
                         serverUrl = serverUrl,
                         username = username,
@@ -92,13 +89,12 @@ class AddAccountActivity : AppCompatActivity() {
                         isActive = true
                     )
 
-                    // Dodaj konto do bazy danych
                     val accountId = configManager.addAccount(account)
                     configManager.setActiveAccount(accountId.toInt())
 
                     runOnUiThread {
                         Toast.makeText(this@AddAccountActivity, "Konto dodane pomyślnie", Toast.LENGTH_SHORT).show()
-                        finish() // Wróć do AccountsManagementActivity
+                        finish()
                     }
                 } else {
                     runOnUiThread {
@@ -111,22 +107,5 @@ class AddAccountActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    private fun createApiService(serverUrl: String): ApiService {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl("$serverUrl/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        return retrofit.create(ApiService::class.java)
     }
 }

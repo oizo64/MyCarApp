@@ -1,4 +1,3 @@
-// AppModule.kt
 package com.example.mycarapp.HiltModule
 
 import android.content.Context
@@ -9,6 +8,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
 @Module
@@ -41,5 +42,15 @@ object AppModule {
         database: AppDatabase
     ): ConfigManager {
         return ConfigManagerImpl(sharedPreferences, appConfig, database)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGsonConverterFactory(): GsonConverterFactory = GsonConverterFactory.create()
+
+    @Provides
+    @Singleton
+    fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
+        return HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
     }
 }

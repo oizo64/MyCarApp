@@ -11,7 +11,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.activities.AlbumsActivity
-import com.example.mycarapp.controller.ApiService
+import com.example.mycarapp.controller.ApiServiceFactory
 import com.example.mycarapp.dto.LoginRequest
 import com.example.mycarapp.dto.LoginResponse
 import com.google.android.material.textfield.TextInputEditText
@@ -19,10 +19,6 @@ import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -30,6 +26,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var configManager: ConfigManager
+
+    @Inject
+    lateinit var apiServiceFactory: ApiServiceFactory
 
     private lateinit var serverUrlLayout: TextInputLayout
     private lateinit var usernameLayout: TextInputLayout
@@ -59,7 +58,6 @@ class MainActivity : AppCompatActivity() {
         connectButton = findViewById(R.id.connect_button)
         statusTextView = findViewById(R.id.status_text_view)
 
-        // Ustawienie domyślnych wartości testowych
         statusTextView.text = getString(R.string.status_initial_text)
     }
 
@@ -104,7 +102,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             try {
-                val apiService = createApiService(serverUrl)
+                val apiService = apiServiceFactory.createPublicApiService(serverUrl)
                 val loginRequest = LoginRequest(username = username, password = password)
                 val response = apiService.login(loginRequest)
 
@@ -119,39 +117,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createApiService(serverUrl: String): ApiService {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl("$serverUrl/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        return retrofit.create(ApiService::class.java)
-    }
-
     private fun handleSuccessfulLogin(
         loginResult: LoginResponse,
         serverUrl: String,
         username: String
     ) {
-        // Pobierz instancję AppConfig z Hilt (to jest singleton)
         val appConfig = configManager.getConfig()
 
-        // Zaktualizuj pola w instancji singletonu
         appConfig.authToken = loginResult.token
         appConfig.subsonicSalt = loginResult.subsonicSalt
         appConfig.subsonicToken = loginResult.subsonicToken
         appConfig.serverUrl = serverUrl
         appConfig.username = username
 
-        // Zapisz zaktualizowane dane do SharedPreferences za pomocą metody updateConfig
         configManager.updateConfig(appConfig)
 
         runOnUiThread {

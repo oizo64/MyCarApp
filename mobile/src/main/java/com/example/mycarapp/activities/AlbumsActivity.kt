@@ -16,10 +16,9 @@ import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.R
 import com.example.mycarapp.Repository.AlbumsRepository
-import com.example.mycarapp.Repository.RemoteAlbumsRepository
 import com.example.mycarapp.adapters.AlbumsAdapter
 import com.example.mycarapp.adapters.OnItemClickListener
-import com.example.mycarapp.controller.ApiService
+import com.example.mycarapp.controller.ApiServiceFactory
 import com.example.mycarapp.dto.Account
 import com.example.mycarapp.dto.Album
 import com.example.mycarapp.dto.LoginRequest
@@ -28,10 +27,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import java.time.Instant
 import javax.inject.Inject
 
@@ -40,9 +35,14 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     @Inject
     lateinit var configManager: ConfigManager
 
+    @Inject
+    lateinit var albumsRepository: AlbumsRepository
+
+    @Inject
+    lateinit var apiServiceFactory: ApiServiceFactory
+
     private lateinit var albumsRecyclerView: RecyclerView
     private lateinit var albumsAdapter: AlbumsAdapter
-    private lateinit var albumsRepository: AlbumsRepository
     private lateinit var progressBar: ProgressBar
     private lateinit var statusTextView: TextView
     private lateinit var fabAddAccount: FloatingActionButton
@@ -131,7 +131,7 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     private fun refreshAccountAndLoadRemote(account: Account) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val apiService = createApiService(account.serverUrl)
+                val apiService = apiServiceFactory.createPublicApiService(account.serverUrl)
                 val loginRequest = LoginRequest(username = account.username, password = account.password)
                 val response = apiService.login(loginRequest)
 
@@ -155,7 +155,6 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
                     configManager.updateConfig(appConfig)
 
                     // Pobierz nowe albumy z serwera
-                    initializeRepository()
                     fetchRemoteAlbums()
                 }
             } catch (e: Exception) {
@@ -182,33 +181,6 @@ class AlbumsActivity : AppCompatActivity(), OnItemClickListener {
     private fun openAddAccountActivity() {
         val intent = Intent(this, AccountsManagementActivity::class.java)
         startActivity(intent)
-    }
-
-    private fun createApiService(serverUrl: String): ApiService {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl("$serverUrl/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        return retrofit.create(ApiService::class.java)
-    }
-
-    private fun initializeRepository() {
-        albumsRepository = RemoteAlbumsRepository(
-            authToken = appConfig.authToken,
-            subsonicSalt = appConfig.subsonicSalt ?: "",
-            subsonicToken = appConfig.subsonicToken ?: "",
-            serverUrl = appConfig.serverUrl!!,
-            username = appConfig.username ?: ""
-        )
     }
 
     private fun updateUIWithAlbums(albums: List<Album>) {

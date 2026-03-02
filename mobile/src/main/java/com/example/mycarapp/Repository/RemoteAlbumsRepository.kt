@@ -1,55 +1,31 @@
 package com.example.mycarapp.Repository
 
-import com.example.mycarapp.controller.ApiService
+import com.example.mycarapp.HiltModule.ConfigManager
+import com.example.mycarapp.controller.ApiServiceFactory
 import com.example.mycarapp.dto.Album
-import okhttp3.Interceptor
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class RemoteAlbumsRepository(
-    private val authToken: String?,
-    private val subsonicSalt: String?,
-    private val subsonicToken: String?,
-    private val serverUrl: String?,
-    private val username: String?
+@Singleton
+class RemoteAlbumsRepository @Inject constructor(
+    private val apiServiceFactory: ApiServiceFactory,
+    private val configManager: ConfigManager
 ) : AlbumsRepository {
 
-    private val apiService: ApiService = createApiService()
-
-    private fun createApiService(): ApiService {
-        val authInterceptor = Interceptor { chain ->
-            val originalRequest = chain.request()
-            val modifiedRequest = originalRequest.newBuilder()
-                .header("X-ND-Authorization", "Bearer $authToken")
-                .build()
-            chain.proceed(modifiedRequest)
-        }
-
-        val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .addInterceptor(authInterceptor)
-            .build()
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl(serverUrl.orEmpty().let { if (it.endsWith("/")) it else "$it/" })
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        return retrofit.create(ApiService::class.java)
-    }
-
     override suspend fun getAlbums(): List<Album> {
+        val config = configManager.getConfig()
+        val serverUrl = config.serverUrl ?: return emptyList()
+        val authToken = config.authToken
+        
+        val apiService = apiServiceFactory.createAuthenticatedApiService(serverUrl, authToken)
+
         return try {
             val response = apiService.getAlbums()
             if (response.isSuccessful) {
                 val albums = response.body() ?: emptyList()
                 albums.map { album ->
-                    album.copy(coverArtUrl = generateCoverArtUrl(album.id))
+                    album.copy(coverArtUrl = generateCoverArtUrl(album.id, config.serverUrl, config.username, config.subsonicToken, config.subsonicSalt))
                 }
             } else {
                 println("API call failed with code: ${response.code()}")
@@ -61,7 +37,7 @@ class RemoteAlbumsRepository(
         }
     }
 
-    private fun generateCoverArtUrl(albumId: String): String {
+    private fun generateCoverArtUrl(albumId: String, serverUrl: String?, username: String?, subsonicToken: String?, subsonicSalt: String?): String {
         return "$serverUrl/rest/getCoverArt?u=$username&t=$subsonicToken&s=$subsonicSalt&v=1.8.0&c=NavidromeUI&id=al-$albumId&size=300"
     }
 }
