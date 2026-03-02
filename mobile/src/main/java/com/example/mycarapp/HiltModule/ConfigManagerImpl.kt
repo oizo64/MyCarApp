@@ -3,6 +3,7 @@ package com.example.mycarapp.HiltModule
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.example.mycarapp.Repository.AccountDao
+import com.example.mycarapp.Repository.AlbumDao
 
 import com.example.mycarapp.dto.Account
 import com.example.mycarapp.dto.Album
@@ -20,9 +21,15 @@ class ConfigManagerImpl @Inject constructor(
 ) : ConfigManager {
 
     private val accountDao: AccountDao = database.accountDao()
+    private val albumDao: AlbumDao = database.albumDao()
 
     init {
         loadConfigFromSharedPreferences()
+        // Opcjonalnie wczytaj albumy z bazy do pamięci przy starcie
+        runBlocking {
+            val savedAlbums = albumDao.getAllAlbumsSync()
+            appConfig.sortedAlbums = savedAlbums
+        }
     }
 
     override fun getConfig(): AppConfig {
@@ -107,31 +114,31 @@ class ConfigManagerImpl @Inject constructor(
             remove(Constants.USERNAME_KEY)
             remove(Constants.ACTIVE_ACCOUNT_ID_KEY)
         }
+        
+        runBlocking {
+            albumDao.deleteAll()
+        }
     }
 
     private fun loadConfigFromSharedPreferences() {
-        // Dla kompatybilności wstecznej - wczytaj stare dane z SharedPreferences
-        // i utwórz z nich konto w bazie danych, jeśli istnieją
         val authToken = sharedPreferences.getString(Constants.AUTH_TOKEN_KEY, null)
         val serverUrl = sharedPreferences.getString(Constants.SERVER_URL_KEY, null)
         val username = sharedPreferences.getString(Constants.USERNAME_KEY, null)
 
         if (authToken != null && serverUrl != null && username != null) {
             runBlocking {
-                // Migruj stare dane do nowej bazy danych
                 val account = Account(
                     serverUrl = serverUrl,
                     username = username,
-                    password = "", // Hasło nie było przechowywane w starym systemie
+                    password = "", 
                     authToken = authToken,
                     subsonicSalt = sharedPreferences.getString(Constants.SUBSONIC_SALT_KEY, null),
                     subsonicToken = sharedPreferences.getString(Constants.SUBSONIC_TOKEN_KEY, null),
                     isActive = true
                 )
 
-                val accountId = accountDao.insert(account)
+                accountDao.insert(account)
 
-                // Wyczyść stare dane z SharedPreferences
                 sharedPreferences.edit {
                     remove(Constants.AUTH_TOKEN_KEY)
                     remove(Constants.SUBSONIC_SALT_KEY)
@@ -142,11 +149,10 @@ class ConfigManagerImpl @Inject constructor(
             }
         }
     }
+    
     override suspend fun setAsDefaultAccount(accountId: Int) {
         accountDao.clearAllDefaultFlags()
         accountDao.setAsDefault(accountId)
-
-        // Opcjonalnie: ustaw też jako aktywne
         setActiveAccount(accountId)
     }
 
@@ -154,12 +160,23 @@ class ConfigManagerImpl @Inject constructor(
         return accountDao.getDefaultAccount()
     }
 
+    override suspend fun saveAlbums(albums: List<Album>) {
+        albumDao.insertAll(albums)
+        appConfig.sortedAlbums = albums
+    }
+
+    override fun getAlbumsFlow(): Flow<List<Album>> {
+        return albumDao.getAllAlbums()
+    }
+
+    override suspend fun getAlbumsSync(): List<Album> {
+        return albumDao.getAllAlbumsSync()
+    }
+
     override fun setSortedAlbums(albums: List<Album>) {
         appConfig.sortedAlbums = albums
-        // Opcjonalnie: zapisz do SharedPreferences jeśli potrzebujesz trwałości
-        sharedPreferences.edit {
-            // Możesz zapisać ilość albumów dla informacji
-            putInt("sorted_albums_count", albums.size)
+        runBlocking {
+            albumDao.insertAll(albums)
         }
     }
 

@@ -15,6 +15,12 @@ interface ConfigManager {
     suspend fun deleteAccount(accountId: Int)
     suspend fun setAsDefaultAccount(accountId: Int)
     suspend fun getDefaultAccount(): Account?
+    
+    // Obsługa albumów
+    suspend fun saveAlbums(albums: List<Album>)
+    fun getAlbumsFlow(): Flow<List<Album>>
+    suspend fun getAlbumsSync(): List<Album>
+    
     fun setSortedAlbums(albums: List<Album>)
     fun getSortedAlbums(): List<Album>
     fun clearConfig()

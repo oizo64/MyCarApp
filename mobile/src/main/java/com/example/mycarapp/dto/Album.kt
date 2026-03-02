@@ -2,11 +2,15 @@ package com.example.mycarapp.dto
 
 import android.annotation.SuppressLint
 import android.os.Parcelable
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 
 @SuppressLint("ParcelCreator")
 @Parcelize
+@Entity(tableName = "albums")
 data class Album(
+    @PrimaryKey
     val id: String = "",
     val name: String,
     val coverArtUrl: String? = null,
