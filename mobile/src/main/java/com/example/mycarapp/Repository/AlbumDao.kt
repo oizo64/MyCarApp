@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AlbumDao {
-    @Query("SELECT * FROM albums")
+    @Query("SELECT * FROM albums ORDER BY createdAt DESC")
     fun getAllAlbums(): Flow<List<Album>>
 
-    @Query("SELECT * FROM albums")
+    @Query("SELECT * FROM albums ORDER BY createdAt DESC")
     suspend fun getAllAlbumsSync(): List<Album>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
