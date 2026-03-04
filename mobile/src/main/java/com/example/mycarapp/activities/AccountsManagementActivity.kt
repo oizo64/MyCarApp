@@ -32,7 +32,7 @@ class AccountsManagementActivity : AppCompatActivity() {
 
     private lateinit var accountsRecyclerView: RecyclerView
     private lateinit var fabAddAccount: FloatingActionButton
-    private lateinit var fabHelp: FloatingActionButton // DODAJ TĘ ZMIENNĄ
+    private lateinit var fabHelp: FloatingActionButton
 
     private lateinit var emptyStateView: View
     private lateinit var accountsAdapter: AccountsAdapter
@@ -48,7 +48,7 @@ class AccountsManagementActivity : AppCompatActivity() {
         }
 
         setupUI()
-        setupListeners() // DODAJ WYWOŁANIE TEJ METODY
+        setupListeners()
         setupSwipeToDelete()
         loadAccounts()
     }
@@ -56,12 +56,11 @@ class AccountsManagementActivity : AppCompatActivity() {
     private fun setupUI() {
         accountsRecyclerView = findViewById(R.id.accounts_recycler_view)
         fabAddAccount = findViewById(R.id.fab_add_account)
-        fabHelp = findViewById(R.id.fab_help) // ZNAJDŹ FAB POMOCY
+        fabHelp = findViewById(R.id.fab_help)
         emptyStateView = findViewById(R.id.empty_state_view)
 
         accountsRecyclerView.layoutManager = LinearLayoutManager(this)
         accountsAdapter = AccountsAdapter(
-            emptyList(),
             onAccountClick = { account -> onAccountSelected(account) },
             onAccountDelete = { account -> showDeleteConfirmation(account) },
             onSetAsDefault = { account -> setAsDefaultAccount(account) }
@@ -97,7 +96,7 @@ class AccountsManagementActivity : AppCompatActivity() {
                     "Ustawiono jako konto domyślne",
                     Toast.LENGTH_SHORT
                 ).show()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 makeText(
                     this@AccountsManagementActivity,
                     "Błąd podczas ustawiania konta domyślnego",
@@ -116,34 +115,36 @@ class AccountsManagementActivity : AppCompatActivity() {
                 viewHolder: RecyclerView.ViewHolder,
                 target: RecyclerView.ViewHolder
             ): Boolean {
-                return false // Nie obsługujemy przeciągania
+                return false
             }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.bindingAdapterPosition
                 val account = accountsAdapter.getAccountAtPosition(position)
-                account?.let { showDeleteConfirmation(it) }
+                account?.let { showDeleteConfirmation(it, position) }
             }
         })
 
         itemTouchHelper.attachToRecyclerView(accountsRecyclerView)
     }
 
-    private fun showDeleteConfirmation(account: Account) {
+    private fun showDeleteConfirmation(account: Account, position: Int? = null) {
         MaterialAlertDialogBuilder(this)
             .setTitle("Usuń konto")
             .setMessage("Czy na pewno chcesz usunąć konto ${account.username}@${account.serverUrl}?")
-            .setPositiveButton("Usuń") { dialog, which ->
-                deleteAccount(account)
+            .setPositiveButton("Usuń") { _, _ ->
+                deleteAccount(account, position)
             }
-            .setNegativeButton("Anuluj") { dialog, which ->
-                accountsAdapter.notifyDataSetChanged() // Odśwież aby przywrócić przesunięty element
+            .setNegativeButton("Anuluj") { _, _ ->
+                if (position != null) {
+                    accountsAdapter.notifyItemChanged(position)
+                }
             }
             .setCancelable(false)
             .show()
     }
 
-    private fun deleteAccount(account: Account) {
+    private fun deleteAccount(account: Account, position: Int? = null) {
         lifecycleScope.launch {
             try {
                 configManager.deleteAccount(account.id)
@@ -152,15 +153,15 @@ class AccountsManagementActivity : AppCompatActivity() {
                     "Konto usunięte",
                     Toast.LENGTH_SHORT
                 ).show()
-
-                // Automatycznie odświeży się przez Flow
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 makeText(
                     this@AccountsManagementActivity,
                     "Błąd podczas usuwania konta",
                     Toast.LENGTH_SHORT
                 ).show()
-                accountsAdapter.notifyDataSetChanged() // Przywróć widok jeśli błąd
+                if (position != null) {
+                    accountsAdapter.notifyItemChanged(position)
+                }
             }
         }
     }
@@ -175,7 +176,7 @@ class AccountsManagementActivity : AppCompatActivity() {
                         showEmptyState()
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 showEmptyState()
             }
         }
@@ -184,7 +185,7 @@ class AccountsManagementActivity : AppCompatActivity() {
     private fun showAccountsList(accounts: List<Account>) {
         accountsRecyclerView.visibility = View.VISIBLE
         emptyStateView.visibility = View.GONE
-        accountsAdapter.updateAccounts(accounts)
+        accountsAdapter.submitList(accounts)
     }
 
     private fun showEmptyState() {
@@ -195,7 +196,7 @@ class AccountsManagementActivity : AppCompatActivity() {
     private fun onAccountSelected(account: Account) {
         lifecycleScope.launch {
             configManager.setActiveAccount(account.id)
-            finish() // Wróć do AlbumsActivity
+            finish()
         }
     }
 
