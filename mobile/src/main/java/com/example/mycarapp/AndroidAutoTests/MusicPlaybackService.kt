@@ -37,6 +37,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -251,10 +252,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         sessionCallback = MediaSessionCallback()
 
         mediaSession = MediaSessionCompat(baseContext, "MusicPlaybackService").apply {
-            setFlags(
-                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                        MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
-            )
             setCallback(sessionCallback)
             setSessionToken(sessionToken)
         }
@@ -572,7 +569,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         val totalSeconds = milliseconds / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-        return String.format("%d:%02d", minutes, seconds)
+        return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
     }
 
     private fun performSeek(pos: Long) {
@@ -733,7 +730,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 return
             }
 
-            if (exoPlayer.isCurrentMediaItemSeekable && duration > 0) {
+            if (exoPlayer.isCurrentMediaItemSeekable) {
                 var newPosition = exoPlayer.currentPosition - SEEK_INTERVAL_MS
                 if (newPosition < 0) {
                     newPosition = 0

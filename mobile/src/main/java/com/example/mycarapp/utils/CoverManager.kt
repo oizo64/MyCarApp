@@ -21,10 +21,10 @@ class CoverManager(private val context: Context) {
     }
 
     fun getLocalCoverUri(albumId: String, remoteCoverUrl: String?): Uri {
-        return getCoverUriInternal(albumId, remoteCoverUrl, useFileProvider = true)
+        return getCoverUriInternal(albumId, remoteCoverUrl)
     }
 
-    private fun getCoverUriInternal(albumId: String, remoteCoverUrl: String?, useFileProvider: Boolean): Uri {
+    private fun getCoverUriInternal(albumId: String, remoteCoverUrl: String?): Uri {
         return if (remoteCoverUrl != null) {
             val localFile = getCoverFile(albumId)
 
@@ -34,11 +34,8 @@ class CoverManager(private val context: Context) {
             )
 
             if (localFile.exists() && localFile.length() > 0) {
-                if (useFileProvider) {
-                    getFileProviderUri(localFile, remoteCoverUrl)
-                } else {
-                    Uri.fromFile(localFile)
-                }
+                // Zawsze używamy FileProvider dla bezpieczeństwa i kompatybilności
+                getFileProviderUri(localFile, remoteCoverUrl)
             } else {
                 // Jeśli plik nie istnieje, użyj URL zdalnego i rozpocznij pobieranie
                 downloadAndSaveCover(albumId, remoteCoverUrl)
@@ -106,7 +103,7 @@ class CoverManager(private val context: Context) {
 
                 // Sprawdź czy to obrazek
                 val contentType = connection.contentType
-                if (!contentType.startsWith("image/")) {
+                if (contentType == null || !contentType.startsWith("image/")) {
                     Log.e("CoverManager", "Invalid content type: $contentType for album: $albumId")
                     return@launch
                 }

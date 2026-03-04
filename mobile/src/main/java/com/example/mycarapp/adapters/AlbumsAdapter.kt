@@ -51,8 +51,8 @@ class AlbumsAdapter(
         val album = albums[position]
 
         holder.albumNameTextView.text = album.name
-        holder.albumArtistTextView.text = "Artysta: ${album.albumArtist}"
-        holder.albumCreatedTextView.text = "Created: ${formatDate(album.createdAt)}"
+        holder.albumArtistTextView.text = context.getString(R.string.artist, album.albumArtist)
+        holder.albumCreatedTextView.text = context.getString(R.string.created, formatDate(album.createdAt))
 
         // Użyj CoverManager do uzyskania lokalnego URI obrazka
         val localCoverUri = coverManager.getLocalCoverUri(album.id, album.coverArtUrl)
