@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import android.widget.Toast.makeText
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -91,13 +92,13 @@ class AccountsManagementActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 configManager.setAsDefaultAccount(account.id)
-                Toast.makeText(
+                makeText(
                     this@AccountsManagementActivity,
                     "Ustawiono jako konto domyślne",
                     Toast.LENGTH_SHORT
                 ).show()
             } catch (e: Exception) {
-                Toast.makeText(
+                makeText(
                     this@AccountsManagementActivity,
                     "Błąd podczas ustawiania konta domyślnego",
                     Toast.LENGTH_SHORT
@@ -119,7 +120,7 @@ class AccountsManagementActivity : AppCompatActivity() {
             }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                val position = viewHolder.adapterPosition
+                val position = viewHolder.bindingAdapterPosition
                 val account = accountsAdapter.getAccountAtPosition(position)
                 account?.let { showDeleteConfirmation(it) }
             }
@@ -146,7 +147,7 @@ class AccountsManagementActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 configManager.deleteAccount(account.id)
-                Toast.makeText(
+                makeText(
                     this@AccountsManagementActivity,
                     "Konto usunięte",
                     Toast.LENGTH_SHORT
@@ -154,7 +155,7 @@ class AccountsManagementActivity : AppCompatActivity() {
 
                 // Automatycznie odświeży się przez Flow
             } catch (e: Exception) {
-                Toast.makeText(
+                makeText(
                     this@AccountsManagementActivity,
                     "Błąd podczas usuwania konta",
                     Toast.LENGTH_SHORT

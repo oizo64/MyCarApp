@@ -7,17 +7,16 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerNotificationManager
 import com.example.mycarapp.R
 import com.example.mycarapp.dto.Album
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.ui.PlayerNotificationManager
 
 class PlayerService : Service() {
     private var exoPlayer: ExoPlayer? = null
@@ -73,7 +72,6 @@ class PlayerService : Service() {
                 "Music Player",
                 NotificationManager.IMPORTANCE_LOW
             )
-            // POPRAWKA: Użyj applicationContext zamiast this
             val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }

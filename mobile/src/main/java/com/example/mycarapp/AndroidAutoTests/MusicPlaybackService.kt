@@ -21,14 +21,15 @@ import android.util.Log
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.media.MediaBrowserServiceCompat
+import androidx.media3.common.MediaItem as MediaItem3
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import com.example.mycarapp.HiltModule.AppConfig
 import com.example.mycarapp.HiltModule.ConfigManager
 import com.example.mycarapp.utils.CoverManager
 import com.example.mycarapp.utils.DateFormatter
 import com.example.mycarapp.utils.StreamUrlGenerator
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -448,7 +449,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 exoPlayer.clearMediaItems()
             }
 
-            val exoPlayerItem = com.google.android.exoplayer2.MediaItem.Builder()
+            val exoPlayerItem = MediaItem3.Builder()
                 .setUri(mediaUri)
                 .setMediaId(mediaId)
                 .build()

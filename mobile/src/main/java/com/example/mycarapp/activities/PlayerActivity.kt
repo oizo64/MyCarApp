@@ -14,6 +14,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import coil.load
 import coil.transform.RoundedCornersTransformation
 import com.example.mycarapp.HiltModule.AppConfig
@@ -22,10 +26,6 @@ import com.example.mycarapp.R
 import com.example.mycarapp.dto.Album
 import com.example.mycarapp.services.PlayerService
 import com.example.mycarapp.utils.StreamUrlGenerator
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
