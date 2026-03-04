@@ -183,4 +183,16 @@ class ConfigManagerImpl @Inject constructor(
     override fun getSortedAlbums(): List<Album> {
         return appConfig.sortedAlbums
     }
+
+    override suspend fun updatePlaybackPosition(albumId: String, position: Long) {
+        albumDao.updatePlaybackPosition(albumId, position)
+        // Aktualizuj również w pamięci
+        appConfig.sortedAlbums = appConfig.sortedAlbums.map {
+            if (it.id == albumId) it.copy(lastPlaybackPosition = position) else it
+        }
+    }
+
+    override suspend fun getPlaybackPosition(albumId: String): Long {
+        return albumDao.getPlaybackPosition(albumId) ?: 0L
+    }
 }

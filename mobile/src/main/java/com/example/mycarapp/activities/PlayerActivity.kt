@@ -61,6 +61,10 @@ class PlayerActivity : AppCompatActivity() {
     private var streamUrl: String? = null
     private val SKIP_TIME_MS = 60000
 
+    private var currentAlbum: Album? = null
+    private var lastSavedPosition: Long = 0L
+    private val SAVE_INTERVAL_MS = 15000L // 15 sekund
+
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,8 +74,9 @@ class PlayerActivity : AppCompatActivity() {
         initializeExoPlayer()
 
         appConfig = configManager.getConfig()
-        val album = intent.getParcelableExtra("ALBUM_DATA", Album::class.java)
+        currentAlbum = intent.getParcelableExtra("ALBUM_DATA", Album::class.java)
 
+        val album = currentAlbum
         if (album == null) {
             Log.e("PlayerActivity", "Błąd: Brak danych albumu.")
             Toast.makeText(this, "Brak danych albumu.", Toast.LENGTH_SHORT).show()
@@ -152,6 +157,7 @@ class PlayerActivity : AppCompatActivity() {
                             runOnUiThread {
                                 playPauseButton.setImageResource(R.drawable.ic_play_arrow)
                                 isPlayingSong.set(false)
+                                savePosition(currentPosition)
                             }
                         }
                         Player.STATE_BUFFERING -> {
@@ -160,6 +166,12 @@ class PlayerActivity : AppCompatActivity() {
                         Player.STATE_IDLE -> {
                             // Idle state
                         }
+                    }
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    if (!isPlaying) {
+                        exoPlayer?.let { savePosition(it.currentPosition) }
                     }
                 }
 
@@ -181,8 +193,24 @@ class PlayerActivity : AppCompatActivity() {
                 val currentPosition = player.currentPosition
                 seekBar.progress = currentPosition.toInt()
                 currentTimeTextView.text = formatTime(currentPosition)
+                
+                // Zapisywanie pozycji co 15 sekund
+                if (Math.abs(currentPosition - lastSavedPosition) >= SAVE_INTERVAL_MS) {
+                    savePosition(currentPosition)
+                }
+
                 // Update every second
                 playPauseButton.postDelayed({ updateProgress() }, 1000)
+            }
+        }
+    }
+
+    private fun savePosition(position: Long) {
+        currentAlbum?.id?.let { albumId ->
+            lastSavedPosition = position
+            lifecycleScope.launch {
+                configManager.updatePlaybackPosition(albumId, position)
+                Log.d("PlayerActivity", "Zapisano pozycję dla $albumId: ${formatTime(position)}")
             }
         }
     }
@@ -254,7 +282,20 @@ class PlayerActivity : AppCompatActivity() {
                 val mediaItem = MediaItem.fromUri(url)
                 exoPlayer?.setMediaItem(mediaItem)
                 exoPlayer?.prepare()
-                exoPlayer?.play()
+
+                // Przywróć zapisaną pozycję
+                lifecycleScope.launch {
+                    val albumId = currentAlbum?.id
+                    if (albumId != null) {
+                        val savedPos = configManager.getPlaybackPosition(albumId)
+                        if (savedPos > 0) {
+                            exoPlayer?.seekTo(savedPos)
+                            lastSavedPosition = savedPos
+                            Log.d("PlayerActivity", "Przywrócono pozycję: ${formatTime(savedPos)}")
+                        }
+                    }
+                    exoPlayer?.play()
+                }
             }
         } catch (e: Exception) {
             Log.e("PlayerActivity", "Błąd podczas rozpoczynania odtwarzania", e)
@@ -267,7 +308,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun pausePlayback() {
-        exoPlayer?.pause()
+        exoPlayer?.let {
+            savePosition(it.currentPosition)
+            it.pause()
+        }
         isPlayingSong.set(false)
         runOnUiThread {
             playPauseButton.setImageResource(R.drawable.ic_play_arrow)
@@ -281,6 +325,7 @@ class PlayerActivity : AppCompatActivity() {
             seekBar.progress = newPosition.toInt()
             currentTimeTextView.text = formatTime(newPosition)
             showSkipFeedback("-1:00")
+            savePosition(newPosition)
         }
     }
 
@@ -291,6 +336,7 @@ class PlayerActivity : AppCompatActivity() {
             seekBar.progress = newPosition.toInt()
             currentTimeTextView.text = formatTime(newPosition)
             showSkipFeedback("+1:00")
+            savePosition(newPosition)
         }
     }
 
@@ -333,14 +379,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        exoPlayer?.let { savePosition(it.currentPosition) }
         super.onDestroy()
         exoPlayer?.release()
         exoPlayer = null
     }
-
-    // USUNIĘTE: onPause() nie pauzuje już odtwarzania
-    // override fun onPause() {
-    //     super.onPause()
-    //     pausePlayback()
-    // }
 }

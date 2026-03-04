@@ -24,4 +24,8 @@ interface ConfigManager {
     fun setSortedAlbums(albums: List<Album>)
     fun getSortedAlbums(): List<Album>
     fun clearConfig()
+
+    // Pozycja odtwarzania
+    suspend fun updatePlaybackPosition(albumId: String, position: Long)
+    suspend fun getPlaybackPosition(albumId: String): Long
 }

@@ -30,6 +30,10 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -57,6 +61,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     lateinit var streamUrlGenerator: StreamUrlGenerator
 
     private lateinit var coverManager: CoverManager
+
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
+
+    private var lastSavedPosition: Long = 0L
+    private val SAVE_INTERVAL_MS = 15000L // 15 sekund
 
     companion object {
         private const val PREFS_NAME = "MusicServicePrefs"
@@ -103,6 +113,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                         if (exoPlayer.duration > 0 && exoPlayer.duration != Long.MAX_VALUE)
                             exoPlayer.duration else 0L
 
+                    // Sprawdź czy należy zapisać pozycję (co 15 sekund)
+                    if (exoPlayer.isPlaying && Math.abs(currentPosition - lastSavedPosition) >= SAVE_INTERVAL_MS) {
+                        saveCurrentPosition(currentPosition)
+                    }
+
                     // Aktualizuj stan z aktualną pozycją i czasem trwania
                     val playbackState = PlaybackStateCompat.Builder()
                         .setState(
@@ -133,6 +148,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             } finally {
                 positionUpdateHandler.postDelayed(this, 1000)
             }
+        }
+    }
+
+    private fun saveCurrentPosition(position: Long) {
+        val currentMediaId = exoPlayer.currentMediaItem?.mediaId ?: return
+        lastSavedPosition = position
+        serviceScope.launch {
+            configManager.updatePlaybackPosition(currentMediaId, position)
+            Log.d("MusicService", "Saved playback position for $currentMediaId: ${formatTime(position)}")
         }
     }
 
@@ -205,10 +229,16 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlaybackState()
+                if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                    saveCurrentPosition(exoPlayer.currentPosition)
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 updatePlaybackState()
+                if (!isPlaying) {
+                    saveCurrentPosition(exoPlayer.currentPosition)
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -336,7 +366,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     override fun onDestroy() {
         super.onDestroy()
+        saveCurrentPosition(exoPlayer.currentPosition)
         positionUpdateHandler.removeCallbacks(positionUpdateRunnable)
+        serviceJob.cancel()
         mediaSession.isActive = false
         exoPlayer.release()
         mediaSession.release()
@@ -423,6 +455,16 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             exoPlayer.setMediaItem(exoPlayerItem)
             exoPlayer.playWhenReady = playWhenReady
             exoPlayer.prepare()
+
+            // Przywróć pozycję odtwarzania
+            serviceScope.launch {
+                val savedPos = configManager.getPlaybackPosition(mediaId)
+                if (savedPos > 0) {
+                    exoPlayer.seekTo(savedPos)
+                    lastSavedPosition = savedPos
+                    Log.d("MusicService", "Restored position for $mediaId: ${formatTime(savedPos)}")
+                }
+            }
 
             // Ustaw początkowe metadane
             val initialDuration =
@@ -578,10 +620,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         override fun onPause() {
             Log.d("MusicService", "onPause called")
             exoPlayer.playWhenReady = false
+            saveCurrentPosition(exoPlayer.currentPosition)
         }
 
         override fun onStop() {
             Log.d("MusicService", "onStop called")
+            saveCurrentPosition(exoPlayer.currentPosition)
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
             audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }

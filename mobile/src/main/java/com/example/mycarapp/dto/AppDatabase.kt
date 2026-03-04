@@ -11,7 +11,7 @@ import com.example.mycarapp.Repository.AccountDao
 import com.example.mycarapp.Repository.AlbumDao
 import com.example.mycarapp.utils.RoomConverters
 
-@Database(entities = [Account::class, Album::class], version = 3, exportSchema = false)
+@Database(entities = [Account::class, Album::class], version = 4, exportSchema = false)
 @TypeConverters(RoomConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun accountDao(): AccountDao
@@ -27,7 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "app_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance
@@ -80,6 +80,12 @@ abstract class AppDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`)
                     )
                 """.trimIndent())
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE albums ADD COLUMN lastPlaybackPosition INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

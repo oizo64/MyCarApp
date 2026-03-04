@@ -43,7 +43,8 @@ data class Album(
     val missing: Boolean = false,
     val importedAt: String = "",
     val createdAt: String = "",
-    val updatedAt: String = ""
+    val updatedAt: String = "",
+    val lastPlaybackPosition: Long = 0L // Nowe pole do zapamiętywania pozycji
 ) : Parcelable
 
 @Parcelize
