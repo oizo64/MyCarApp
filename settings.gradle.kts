@@ -22,4 +22,3 @@ dependencyResolutionManagement {
 rootProject.name = "MyCarApp"
 include(":mobile")
 include(":automotive")
-
